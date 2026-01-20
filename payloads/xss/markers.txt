@@ -1,0 +1,94 @@
+# XSS Detection Markers
+# These unique strings are used to detect XSS reflection in responses
+
+# Primary markers
+ANVILXSS
+ANVIL_XSS_TEST
+ANVIL_XSS_MARKER
+ANVIL_XSS_PROBE
+ANVIL_MARKER_12345
+
+# Numeric markers
+XSS123456789
+XSS987654321
+XSSTEST999
+
+# Alphanumeric markers
+XSSMARK7A8B9C
+XSSTEST1A2B3C
+ANVIL_999_XSS
+
+# With special characters (for reflection detection)
+{ANVIL_XSS_MARKER}
+[ANVIL_XSS_MARKER]
+<ANVIL_XSS_MARKER>
+ANVIL::XSS::MARKER
+ANVIL-XSS-MARKER-001
+
+# Random unique strings (less likely to collide)
+XSSMARK_7f8a9b2c3d
+ANVIL_XSS_4e5f6a1b2c
+XSSTEST_9z8y7x6w5v
+
+# Timestamped markers (dynamic)
+ANVIL_XSS_{timestamp}
+XSS_MARKER_{random}
+
+# Multi-context markers
+ANVIL'XSS"MARKER
+ANVIL`XSS`MARKER
+ANVIL\XSS/MARKER
+
+# Base64 encoded markers (for bypass detection)
+QU5WSUxfWFNT
+WFNTTUFSS0VS
+
+# Hex encoded markers
+416e76696c585353
+5853534d61726b6572
+
+# URL encoded markers
+ANVIL%5FXSS
+XSS%5FMARKER
+
+# HTML entity encoded markers
+ANVIL&#95;XSS
+XSS&#95;MARKER
+
+# Mixed case markers (for case sensitivity testing)
+AnViLXsS
+xSsMaRkEr
+AnViL_XSS_TeSt
+
+# Numeric sequence markers
+1234567890ANVIL
+ANVIL9876543210
+
+# UUID-style markers
+ANVIL-XSS-550e8400-e29b-41d4-a716
+XSS-MARKER-6ba7b810-9dad-11d1-80b4
+
+# With common delimiters
+ANVIL|XSS|MARKER
+ANVIL:XSS:MARKER
+ANVIL.XSS.MARKER
+ANVIL_XSS_MARKER
+
+# Short markers (minimal)
+AXSS
+XSSM
+A1X2S3
+
+# Long markers (detailed tracking)
+ANVIL_XSS_COMPREHENSIVE_MARKER_TEST
+EXTENDED_XSS_MARKER_FOR_ANVIL_SCANNER
+
+# Context-specific markers
+HTML_ANVIL_XSS
+ATTR_ANVIL_XSS
+JS_ANVIL_XSS
+URL_ANVIL_XSS
+
+# For blind XSS detection
+BLIND_XSS_ANVIL_CALLBACK
+OOB_XSS_ANVIL_MARKER

