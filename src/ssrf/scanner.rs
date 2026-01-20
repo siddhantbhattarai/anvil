@@ -1,0 +1,176 @@
+//! SSRF scanner - High-level scanning orchestration
+
+use crate::http::client::HttpClient;
+use crate::scanner::sitemap::SiteMap;
+use crate::ssrf::detector::SsrfDetector;
+use crate::ssrf::evidence::SsrfResult;
+use crate::ssrf::params::SsrfParamIdentifier;
+use crate::ssrf::SsrfConfig;
+use url::Url;
+
+/// High-level SSRF scanner
+pub struct SsrfScanner {
+    config: SsrfConfig,
+    detector: SsrfDetector,
+    param_identifier: SsrfParamIdentifier,
+}
+
+impl SsrfScanner {
+    pub fn new(config: SsrfConfig) -> Self {
+        let detector = SsrfDetector::new(config.clone());
+        let param_identifier = SsrfParamIdentifier::new();
+
+        Self {
+            config,
+            detector,
+            param_identifier,
+        }
+    }
+
+    /// Scan a URL for SSRF vulnerabilities
+    pub async fn scan(
+        &self,
+        client: &HttpClient,
+        target_url: &Url,
+        sitemap: &SiteMap,
+    ) -> anyhow::Result<Vec<SsrfResult>> {
+        let mut results = Vec::new();
+
+        tracing::info!("Starting SSRF scan");
+
+        // Iterate through all endpoints in the sitemap
+        for (path, endpoint) in &sitemap.endpoints {
+            if endpoint.parameters.is_empty() {
+                continue;
+            }
+
+            let endpoint_url = match target_url.join(path) {
+                Ok(u) => u,
+                Err(e) => {
+                    tracing::warn!("Failed to join path '{}': {}", path, e);
+                    continue;
+                }
+            };
+
+            tracing::debug!("Scanning endpoint: {}", endpoint_url);
+
+            // Identify SSRF candidate parameters
+            let candidates = self.param_identifier.identify_from_url(&endpoint_url);
+
+            if candidates.is_empty() {
+                tracing::debug!("No SSRF candidate parameters found in {}", endpoint_url);
+                continue;
+            }
+
+            tracing::info!(
+                "Found {} SSRF candidate parameter(s) in {}",
+                candidates.len(),
+                endpoint_url
+            );
+
+            // Test each candidate parameter
+            for candidate in candidates {
+                tracing::info!(
+                    "Testing parameter '{}' (score: {:.1}, reason: {})",
+                    candidate.param_name,
+                    candidate.score,
+                    candidate.reason
+                );
+
+                match self
+                    .detector
+                    .detect(
+                        client,
+                        &endpoint_url,
+                        &candidate.param_name,
+                        &candidate.param_value,
+                    )
+                    .await
+                {
+                    Ok(Some(result)) => {
+                        tracing::warn!(
+                            "[SSRF DETECTED] {} - {} (confidence: {:.0}%)",
+                            result.classification.severity(),
+                            result.endpoint,
+                            result.confidence * 100.0
+                        );
+                        results.push(result);
+                    }
+                    Ok(None) => {
+                        tracing::debug!("No SSRF detected in parameter '{}'", candidate.param_name);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Error testing parameter '{}': {}",
+                            candidate.param_name,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        if results.is_empty() {
+            tracing::info!("No SSRF vulnerabilities found");
+        } else {
+            tracing::warn!("Found {} SSRF vulnerabilities", results.len());
+        }
+
+        Ok(results)
+    }
+
+    /// Scan a single parameter directly
+    pub async fn scan_parameter(
+        &self,
+        client: &HttpClient,
+        url: &Url,
+        param_name: &str,
+    ) -> anyhow::Result<Option<SsrfResult>> {
+        tracing::info!("Scanning parameter '{}' for SSRF", param_name);
+
+        // Get original value
+        let original_value = url
+            .query_pairs()
+            .find(|(k, _)| k == param_name)
+            .map(|(_, v)| v.to_string())
+            .unwrap_or_default();
+
+        // Run detection
+        self.detector
+            .detect(client, url, param_name, &original_value)
+            .await
+    }
+}
+
+impl SsrfConfig {
+    /// Set OOB callback domain
+    pub fn with_oob_callback(mut self, callback: Option<String>) -> Self {
+        self.oob_callback = callback;
+        self
+    }
+
+    /// Set confidence threshold
+    pub fn with_threshold(mut self, threshold: f32) -> Self {
+        self.confidence_threshold = threshold;
+        self
+    }
+
+    /// Enable/disable internal network testing
+    pub fn with_internal_testing(mut self, enabled: bool) -> Self {
+        self.test_internal = enabled;
+        self
+    }
+
+    /// Enable/disable metadata testing
+    pub fn with_metadata_testing(mut self, enabled: bool) -> Self {
+        self.test_metadata = enabled;
+        self
+    }
+
+    /// Enable/disable scheme testing
+    pub fn with_scheme_testing(mut self, enabled: bool) -> Self {
+        self.test_schemes = enabled;
+        self
+    }
+}
+
