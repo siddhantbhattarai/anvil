@@ -1,0 +1,275 @@
+//! Global context for scan execution
+
+use crate::cli::args::Cli;
+use crate::core::capability::Capability;
+use crate::core::profile::ScanProfile;
+use crate::core::scope::Scope;
+use crate::sqli::SqliConfig;
+use crate::ssrf::SsrfConfig;
+use std::collections::HashMap;
+
+/// Enumeration options (like sqlmap)
+#[derive(Debug, Clone, Default)]
+pub struct EnumerationConfig {
+    pub dbs: bool,
+    pub tables: bool,
+    pub columns: bool,
+    pub schema: bool,
+    pub count: bool,
+    pub dump: bool,
+    pub dump_all: bool,
+    pub database: Option<String>,
+    pub table: Option<String>,
+    pub columns_list: Option<Vec<String>>,
+    pub start: usize,
+    pub stop: Option<usize>,
+    // DB Info
+    pub banner: bool,
+    pub current_user: bool,
+    pub current_db: bool,
+    pub hostname: bool,
+    pub is_dba: bool,
+    // User enum
+    pub users: bool,
+    pub passwords: bool,
+    pub privileges: bool,
+    pub roles: bool,
+}
+
+impl EnumerationConfig {
+    pub fn has_any(&self) -> bool {
+        self.dbs || self.tables || self.columns || self.schema || 
+        self.count || self.dump || self.dump_all ||
+        self.banner || self.current_user || self.current_db ||
+        self.hostname || self.is_dba ||
+        self.users || self.passwords || self.privileges || self.roles
+    }
+}
+
+pub struct Context {
+    pub target: String,
+    pub rate_limit: u32,
+    pub crawl_depth: u32,
+    pub quiet: bool,
+    pub verbose: bool,
+    pub scope: Scope,
+    pub profile: ScanProfile,
+    pub sqli_config: SqliConfig,
+    pub ssrf_config: SsrfConfig,
+    pub output_format: String,
+    pub output_file: Option<String>,
+    // Authentication
+    pub cookies: Option<String>,
+    pub headers: HashMap<String, String>,
+    // Direct testing
+    pub direct_param: Option<String>,
+    pub post_data: Option<String>,
+    pub http_method: String,
+    // Second-order SQLi
+    pub trigger_url: Option<String>,
+    pub extra_data: Option<String>,
+    // Enumeration (like sqlmap)
+    pub enumeration: EnumerationConfig,
+    // Detection tuning
+    pub threshold: f32,
+    pub risk: u8,
+    pub level: u8,
+    pub technique: String,
+    pub threads: usize,
+    // Injection customization
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
+}
+
+impl Context {
+    pub fn from_cli(cli: Cli) -> anyhow::Result<Self> {
+        let scope = Scope::new(&cli.target)?;
+
+        // Build scan profile from CLI flags
+        let has_enumeration = cli.has_enumeration();
+        
+        let profile = if cli.all {
+            ScanProfile::all()
+        } else {
+            let mut profile = ScanProfile::empty();
+
+            // Determine if any specific module was requested
+            let has_specific_module = cli.sqli
+                || cli.time_sqli
+                || cli.stacked
+                || cli.oob
+                || cli.second_order
+                || cli.sqli_all
+                || cli.xss
+                || cli.xss_stored
+                || cli.xss_dom
+                || cli.xss_blind
+                || cli.xss_all
+                || cli.ssrf
+                || cli.ssrf_all
+                || has_enumeration;
+
+            // Enable fingerprint and crawl by default if no specific module requested
+            // BUT if direct param is specified, skip crawling
+            if cli.fingerprint || (!has_specific_module && cli.param.is_none()) {
+                profile.enable(Capability::Fingerprint);
+            }
+            if (cli.crawl || !has_specific_module) && cli.param.is_none() && !has_enumeration {
+                profile.enable(Capability::Crawl);
+            }
+
+            // SQL Injection capabilities
+            // Enable SQLi detection if any enumeration flag is set
+            if cli.sqli_all || has_enumeration {
+                profile.enable(Capability::SqlInjection);
+                profile.enable(Capability::TimeSqlInjection);
+                profile.enable(Capability::StackedSqlInjection);
+                if cli.oob_callback.is_some() {
+                    profile.enable(Capability::OobSqlInjection);
+                }
+            } else {
+                if cli.sqli {
+                    profile.enable(Capability::SqlInjection);
+                }
+                if cli.time_sqli {
+                    profile.enable(Capability::TimeSqlInjection);
+                }
+                if cli.stacked {
+                    profile.enable(Capability::StackedSqlInjection);
+                }
+                if cli.oob {
+                    profile.enable(Capability::OobSqlInjection);
+                }
+                if cli.second_order {
+                    profile.enable(Capability::SecondOrderSqli);
+                }
+            }
+
+            // Exploitation modes
+            if cli.proof || has_enumeration {
+                profile.enable(Capability::ProofMode);
+            }
+            if cli.exploit || cli.dump || cli.dump_all {
+                profile.enable(Capability::ExploitMode);
+            }
+            if cli.dump_hashes || cli.passwords {
+                profile.enable(Capability::HashDump);
+            }
+
+            // XSS capabilities
+            if cli.xss {
+                profile.enable(Capability::Xss);
+            }
+            if cli.xss_stored {
+                profile.enable(Capability::StoredXss);
+            }
+            if cli.xss_dom {
+                profile.enable(Capability::DomXss);
+            }
+            if cli.xss_blind {
+                profile.enable(Capability::BlindXss);
+            }
+            // Enable all XSS types if xss_all is set
+            if cli.xss_all {
+                profile.enable(Capability::Xss);
+                profile.enable(Capability::StoredXss);
+                profile.enable(Capability::DomXss);
+                profile.enable(Capability::BlindXss);
+            }
+
+            // SSRF capabilities
+            if cli.ssrf || cli.ssrf_all {
+                profile.enable(Capability::Ssrf);
+            }
+
+            profile
+        };
+
+        // Build SQLi configuration
+        let sqli_config = SqliConfig {
+            boolean: profile.has(Capability::SqlInjection) || cli.technique.contains('B'),
+            time_based: profile.has(Capability::TimeSqlInjection) || cli.technique.contains('T'),
+            stacked: profile.has(Capability::StackedSqlInjection) || cli.technique.contains('S'),
+            oob: profile.has(Capability::OobSqlInjection),
+            oob_callback: cli.oob_callback,
+            time_samples: cli.time_samples,
+            time_delay: cli.time_delay,
+            proof_mode: profile.has(Capability::ProofMode),
+            exploit_mode: profile.has(Capability::ExploitMode),
+        };
+
+        // Build SSRF configuration
+        let ssrf_config = SsrfConfig {
+            oob_callback: cli.ssrf_callback,
+            test_internal: cli.ssrf_all || cli.ssrf_internal,
+            test_metadata: cli.ssrf_all || cli.ssrf_metadata,
+            test_schemes: cli.ssrf_all || cli.ssrf_schemes,
+            external_timeout: 5000,
+            internal_timeout: 2000,
+            confidence_threshold: cli.threshold,
+            max_payloads: cli.ssrf_max_payloads,
+        };
+
+        // Parse custom headers
+        let mut headers = HashMap::new();
+        for header in &cli.headers {
+            if let Some((key, value)) = header.split_once(':') {
+                headers.insert(key.trim().to_string(), value.trim().to_string());
+            }
+        }
+
+        // Build enumeration config
+        let enumeration = EnumerationConfig {
+            dbs: cli.dbs,
+            tables: cli.tables,
+            columns: cli.columns,
+            schema: cli.schema,
+            count: cli.count,
+            dump: cli.dump,
+            dump_all: cli.dump_all,
+            database: cli.database,
+            table: cli.table,
+            columns_list: cli.columns_list.map(|s| s.split(',').map(|c| c.trim().to_string()).collect()),
+            start: cli.start,
+            stop: cli.stop,
+            banner: cli.banner,
+            current_user: cli.current_user,
+            current_db: cli.current_db,
+            hostname: cli.hostname,
+            is_dba: cli.is_dba,
+            users: cli.users,
+            passwords: cli.passwords || cli.dump_hashes,
+            privileges: cli.privileges,
+            roles: cli.roles,
+        };
+
+        Ok(Self {
+            target: cli.target,
+            rate_limit: cli.rate,
+            crawl_depth: cli.depth,
+            quiet: cli.quiet,
+            verbose: cli.verbose,
+            scope,
+            profile,
+            sqli_config,
+            ssrf_config,
+            output_format: cli.format,
+            output_file: cli.output,
+            cookies: cli.cookie,
+            headers,
+            direct_param: cli.param,
+            post_data: cli.data,
+            http_method: cli.method.to_uppercase(),
+            trigger_url: cli.trigger_url,
+            extra_data: cli.extra_data,
+            enumeration,
+            threshold: cli.threshold,
+            risk: cli.risk,
+            level: cli.level,
+            technique: cli.technique,
+            threads: cli.threads,
+            prefix: cli.prefix,
+            suffix: cli.suffix,
+        })
+    }
+}
