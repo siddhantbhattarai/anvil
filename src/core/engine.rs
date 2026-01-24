@@ -10,9 +10,7 @@ use crate::http::request::HttpRequest;
 use crate::scanner::crawler::Crawler;
 use crate::scanner::fingerprint::fingerprint_response;
 use crate::scanner::sitemap::SiteMap;
-use crate::sqli::inference::stacked;
-use crate::sqli::proof::{capabilities as sqli_caps, metadata as sqli_meta};
-use crate::sqli::{DatabaseType, Extractor, SqliResult, SqliScanner};
+use crate::sqli::{SqliResult, SqliTechnique};
 use crate::validation::baseline::Baseline;
 use reqwest::Method;
 use url::Url;
@@ -236,19 +234,6 @@ impl Engine {
     ) -> anyhow::Result<()> {
         tracing::info!("Running in enumeration mode");
 
-        // Need a parameter to test
-        let param = match &self.ctx.direct_param {
-            Some(p) => p.clone(),
-            None => {
-                // Try to extract from URL query string
-                if let Some((_, v)) = target_url.query_pairs().next() {
-                    v.to_string()
-                } else {
-                    anyhow::bail!("No parameter specified. Use -p to specify the injectable parameter.");
-                }
-            }
-        };
-
         // Get param name from URL or use the one provided
         let param_name = self.ctx.direct_param.clone().unwrap_or_else(|| {
             target_url.query_pairs()
@@ -259,45 +244,23 @@ impl Engine {
 
         tracing::info!("Testing parameter: {}", param_name);
 
-        // First, detect SQLi and database type
+        // Create SQLi engine and detect injection
         tracing::info!("Phase 1: Detecting SQL injection vulnerability...");
         
-        let mut sitemap = SiteMap::new(target_url.to_string());
-        sitemap.add_endpoint(
-            target_url.path().to_string(),
-            &self.ctx.http_method,
-            vec![param_name.clone()],
-        );
-
-        let scanner = SqliScanner::new(self.ctx.sqli_config.clone());
-        let sqli_results = scanner.scan(client, target_url, &sitemap).await?;
-
-        if sqli_results.is_empty() {
+        let mut engine = crate::sqli::SqliEngine::new(client);
+        
+        if !engine.detect(target_url, &param_name).await? {
             tracing::warn!("No SQL injection vulnerability detected");
             tracing::info!("Try adjusting --level and --risk for more thorough testing");
             return Ok(());
         }
 
-        // Get the best result
-        let best_result = sqli_results.iter()
-            .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap())
-            .unwrap();
-
-        tracing::info!(
-            "[+] SQL injection confirmed: {} (confidence: {:.0}%)",
-            best_result.technique,
-            best_result.confidence * 100.0
-        );
-
-        // Detect database type
-        let db_type = best_result.db_type.unwrap_or(DatabaseType::MySQL);
-        tracing::info!("[+] Backend DBMS: {}", db_type);
-
-        // Add SQLi findings to reporter
-        self.add_sqli_to_report(&sqli_results, reporter);
-
-        // Create extractor
-        let extractor = Extractor::new(db_type);
+        tracing::info!("[+] SQL injection confirmed: UNION-based");
+        tracing::info!("[+] Backend DBMS: {}", engine.db_type);
+        
+        if let Some(ref v) = engine.vector {
+            tracing::info!("[+] Columns: {}, Position: {}", v.count, v.position);
+        }
 
         // -------------------------------------------------
         // Database Information
@@ -307,8 +270,9 @@ impl Engine {
            self.ctx.enumeration.is_dba {
             tracing::info!("\n[*] Retrieving database information...");
             
-            let info = extractor.get_info(client, target_url, &param_name).await?;
-            println!("{}", info);
+            if let Some(db) = engine.get_current_db(target_url, &param_name).await? {
+                println!("Current database: {}", db);
+            }
         }
 
         // -------------------------------------------------
@@ -317,7 +281,7 @@ impl Engine {
         if self.ctx.enumeration.dbs || self.ctx.enumeration.schema {
             tracing::info!("\n[*] Enumerating databases...");
             
-            let databases = extractor.get_databases(client, target_url, &param_name).await?;
+            let databases = engine.get_dbs(target_url, &param_name).await?;
             
             if databases.is_empty() {
                 tracing::warn!("No databases found (may need higher privileges)");
@@ -352,7 +316,7 @@ impl Engine {
             if let Some(database) = db {
                 tracing::info!("\n[*] Enumerating tables in '{}'...", database);
                 
-                let tables = extractor.get_tables(client, target_url, &param_name, &database).await?;
+                let tables = engine.get_tables(target_url, &param_name, &database).await?;
                 
                 if tables.is_empty() {
                     tracing::warn!("No tables found in database '{}'", database);
@@ -388,13 +352,13 @@ impl Engine {
         // -------------------------------------------------
         if self.ctx.enumeration.columns || self.ctx.enumeration.schema {
             let db = self.ctx.enumeration.database.clone();
-            let table = self.ctx.enumeration.table.clone();
+            let tbl = self.ctx.enumeration.table.clone();
 
-            match (db, table) {
+            match (db, tbl) {
                 (Some(database), Some(table)) => {
                     tracing::info!("\n[*] Enumerating columns in '{}.{}'...", database, table);
                     
-                    let columns = extractor.get_columns(client, target_url, &param_name, &database, &table).await?;
+                    let columns = engine.get_columns(target_url, &param_name, &database, &table).await?;
                     
                     if columns.is_empty() {
                         tracing::warn!("No columns found in table '{}'", table);
@@ -438,24 +402,32 @@ impl Engine {
         // -------------------------------------------------
         if self.ctx.enumeration.dump {
             let db = self.ctx.enumeration.database.clone();
-            let table = self.ctx.enumeration.table.clone();
+            let tbl = self.ctx.enumeration.table.clone();
             let cols = self.ctx.enumeration.columns_list.clone();
 
-            match (db, table) {
+            match (db, tbl) {
                 (Some(database), Some(table)) => {
                     tracing::info!("\n[*] Dumping data from '{}.{}'...", database, table);
                     
-                    let table_data = extractor.dump_table(
-                        client, 
-                        target_url, 
-                        &param_name, 
-                        &database, 
-                        &table,
-                        cols,
-                    ).await?;
+                    // Get columns first if not specified
+                    let columns = if let Some(c) = cols {
+                        c
+                    } else {
+                        engine.get_columns(target_url, &param_name, &database, &table).await?
+                    };
                     
-                    println!("\n{}", table_data.to_table());
-                    println!("Retrieved {} rows", table_data.rows.len());
+                    let rows = engine.dump_table(target_url, &param_name, &database, &table, &columns).await?;
+                    
+                    // Print table
+                    if !rows.is_empty() {
+                        println!("\n{}", columns.join(","));
+                        for row in &rows {
+                            println!("{}", row.join(","));
+                        }
+                        println!("\nRetrieved {} rows", rows.len());
+                    } else {
+                        println!("No data found");
+                    }
                 }
                 _ => {
                     tracing::warn!("Use -D <database> -T <table> to specify target.");
@@ -464,68 +436,28 @@ impl Engine {
         }
 
         // -------------------------------------------------
-        // Enumerate Users
+        // Enumerate Users (simplified)
         // -------------------------------------------------
         if self.ctx.enumeration.users {
             tracing::info!("\n[*] Enumerating database users...");
-            
-            let users = extractor.get_users(client, target_url, &param_name).await?;
-            
-            if !users.is_empty() {
-                // Calculate dynamic width
-                let max_user_len = users.iter().map(|u| u.len()).max().unwrap_or(20);
-                let min_width = 40;
-                let content_width = std::cmp::max(max_user_len + 6, min_width);
-                
-                let border = "═".repeat(content_width);
-                println!("\n╔{}╗", border);
-                println!("║{:^width$}║", "DATABASE USERS", width = content_width);
-                println!("╠{}╣", border);
-                for user in &users {
-                    println!("║  [*] {:<width$}║", user, width = content_width - 6);
-                }
-                println!("╚{}╝", border);
-            }
+            tracing::warn!("User enumeration not implemented in simplified engine");
         }
 
         // -------------------------------------------------
-        // Extract Password Hashes
+        // Extract Password Hashes (simplified)
         // -------------------------------------------------
         if self.ctx.enumeration.passwords {
             tracing::warn!("\n[*] Extracting password hashes...");
-            
-            let creds = extractor.get_passwords(client, target_url, &param_name).await?;
-            
-            if !creds.is_empty() {
-                // Calculate dynamic width based on longest username + hash
-                let max_user_len = creds.iter().map(|c| c.username.len()).max().unwrap_or(10);
-                let max_hash_len = creds.iter()
-                    .map(|c| c.password_hash.as_ref().map(|h| h.len()).unwrap_or(3))
-                    .max().unwrap_or(32);
-                let min_width = 40;
-                let content_width = std::cmp::max(max_user_len + max_hash_len + 5, min_width); // +5 for " : "
-                
-                let border = "═".repeat(content_width);
-                println!("\n╔{}╗", border);
-                println!("║{:^width$}║", "PASSWORD HASHES", width = content_width);
-                println!("╠{}╣", border);
-                for cred in &creds {
-                    let hash = cred.password_hash.as_deref().unwrap_or("N/A");
-                    let line = format!("  {} : {}", cred.username, hash);
-                    println!("║{:<width$}║", line, width = content_width);
-                }
-                println!("╚{}╝", border);
-            }
+            tracing::warn!("Password extraction not implemented in simplified engine");
         }
 
         // -------------------------------------------------
-        // Enumerate Privileges
+        // Enumerate Privileges (simplified)
         // -------------------------------------------------
         if self.ctx.enumeration.privileges {
             tracing::info!("\n[*] Enumerating user privileges...");
-            
-            let privs = extractor.get_privileges(client, target_url, &param_name).await?;
-            
+            tracing::warn!("Privilege enumeration not implemented in simplified engine");
+            let privs: Vec<(String, String)> = Vec::new();
             if !privs.is_empty() {
                 // Calculate dynamic width
                 let max_user_len = privs.iter().map(|(u, _)| u.len()).max().unwrap_or(10);
@@ -560,28 +492,8 @@ impl Engine {
         tracing::info!("Starting second-order SQL injection scan");
         tracing::info!("  Inject URL: {}", inject_url);
         tracing::info!("  Trigger URL: {}", trigger_url);
-
-        let mut results = Vec::new();
-
-        // Get the parameter to test
-        if let Some(ref param) = self.ctx.direct_param {
-            // Run second-order detection
-            if let Some(result) = crate::sqli::inference::boolean::detect_second_order(
-                client,
-                inject_url,
-                trigger_url,
-                param,
-                self.ctx.extra_data.as_deref(),
-            )
-            .await?
-            {
-                results.push(result);
-            }
-        } else {
-            tracing::warn!("No parameter specified for second-order SQLi. Use --param to specify.");
-        }
-
-        Ok(results)
+        tracing::warn!("Second-order SQLi detection not yet implemented in new engine");
+        Ok(Vec::new())
     }
 
     /// Run SQL injection scan with all enabled techniques
@@ -592,60 +504,31 @@ impl Engine {
         sitemap: &SiteMap,
     ) -> anyhow::Result<Vec<SqliResult>> {
         tracing::info!("Starting SQL injection scan");
-
-        let scanner = SqliScanner::new(self.ctx.sqli_config.clone());
-        let results = scanner.scan(client, target_url, sitemap).await?;
-
-        // Run additional techniques if enabled
-        let mut all_results = results;
-
-        // Stacked queries detection
-        if self.ctx.profile.has(Capability::StackedSqlInjection) {
-            tracing::info!("Running stacked queries detection");
-            
-            for (path, ep) in sitemap.endpoints.iter() {
-                if ep.parameters.is_empty() {
-                    continue;
-                }
-
-                let base_url = match target_url.join(path) {
-                    Ok(u) => u,
-                    Err(_) => continue,
-                };
-
-                for param in &ep.parameters {
-                    if let Some(result) = stacked::detect(client, &base_url, param).await? {
-                        all_results.push(result);
-                    }
-                }
+        
+        let mut all_results = Vec::new();
+        
+        // Test each endpoint
+        for (path, ep) in sitemap.endpoints.iter() {
+            if ep.parameters.is_empty() {
+                continue;
             }
-        }
 
-        // OOB detection (if callback configured)
-        if self.ctx.profile.has(Capability::OobSqlInjection) {
-            if let Some(ref callback) = self.ctx.sqli_config.oob_callback {
-                tracing::info!("Running OOB SQLi detection with callback: {}", callback);
-                
-                for (path, ep) in sitemap.endpoints.iter() {
-                    if ep.parameters.is_empty() {
-                        continue;
-                    }
+            let base_url = match target_url.join(path) {
+                Ok(u) => u,
+                Err(_) => continue,
+            };
 
-                    let base_url = match target_url.join(path) {
-                        Ok(u) => u,
-                        Err(_) => continue,
-                    };
-
-                    for param in &ep.parameters {
-                        if let Some(result) = crate::sqli::inference::oob::detect(
-                            client,
-                            &base_url,
-                            param,
-                            callback,
-                        ).await? {
-                            all_results.push(result);
-                        }
-                    }
+            for param in &ep.parameters {
+                let mut engine = crate::sqli::SqliEngine::new(client);
+                if engine.detect(&base_url, param).await? {
+                    all_results.push(SqliResult {
+                        endpoint: base_url.to_string(),
+                        parameter: param.clone(),
+                        technique: SqliTechnique::Union,
+                        confidence: 0.9,
+                        db_type: Some(engine.db_type),
+                        details: format!("UNION-based SQLi detected"),
+                    });
                 }
             }
         }
