@@ -6,139 +6,9 @@ use clap::Parser;
     name = "anvil",
     version = "0.1.0",
     author = "Siddhant Bhattarai",
-    about = "ANVIL – Enterprise-grade Adversarial Security Testing Framework",
-    long_about = r#"
-ANVIL is a modular, inference-driven security testing framework that surpasses
-traditional tools like sqlmap through:
-
-  • Reasoning-driven detection with confidence scoring
-  • Statistical time-based analysis (resists jitter/noise)
-  • Baseline modeling and response diffing
-  • Clean separation of detection and exploitation
-  • Enterprise-grade scope enforcement & rate limiting
-  • Explainable, verifiable findings
-
-SQL INJECTION DETECTION:
-  • Boolean/Error-based inference
-  • Time-based blind with statistical modeling
-  • UNION-based extraction
-  • Stacked queries detection
-  • Out-of-band (OOB) via DNS/HTTP callbacks
-  • Second-order SQLi detection
-
-SQL INJECTION EXPLOITATION:
-  • Database enumeration (--dbs)
-  • Table enumeration (--tables)
-  • Column enumeration (--columns)
-  • Data extraction (--dump)
-  • User/password enumeration (--users, --passwords)
-  • Privilege enumeration (--privileges)
-
-CROSS-SITE SCRIPTING (XSS) DETECTION:
-  Professional evidence-driven XSS detection with zero false positives
-  
-  Detection Methodology:
-  • Stage 1: Data reachability (benign marker probing)
-  • Stage 2: Context classification (HTML/JS/Attribute/URL/CSS)
-  • Stage 3: Encoding assessment (context-specific validation)
-  • Stage 4: Structural breakout verification (explicit proof)
-  • Stage 5: Dual confidence scoring (injection + execution)
-  
-  XSS Types Detected:
-  • Reflected XSS (immediate execution in same response)
-  • Stored/Persistent XSS (execution after persistence)
-  • DOM-based XSS (client-side source-to-sink analysis)
-  • Blind XSS (out-of-band callback confirmation)
-  
-  Professional Features:
-  • "Confirmed" vs "Likely Exploitable" classification
-  • Interaction requirement detection (click, hover, focus)
-  • Context breakout verification (not just reflection)
-  • One-line "WHY THIS IS XSS" justification
-  • CSP detection as exploitability modifier
-  • Confidence decoupled from severity
-  
-  Output Modes:
-  • Default: Clean summary (what's vulnerable)
-  • --verbose: Full methodology (how it was detected)
-  • --output file: Complete report (documentation)
-  
-  Principle: Reflection ≠ Execution
-
-SERVER-SIDE REQUEST FORGERY (SSRF) DETECTION:
-  Evidence-driven SSRF detection with zero false positives
-  
-  Detection Methodology:
-  • Stage 1: Parameter identification (URL/host/webhook fields)
-  • Stage 2: Reachability testing (confirm outbound requests)
-  • Stage 3: Controlled probes (internal IPs, metadata, schemes)
-  • Stage 4: Evidence analysis (OOB, timing, response behavior)
-  • Stage 5: Classification (Confirmed/Internal/Blind/Limited/Candidate)
-  
-  SSRF Types Detected:
-  • Confirmed SSRF (OOB callback or metadata access proven)
-  • Internal Network SSRF (internal IP reachable with proof)
-  • Blind SSRF (asynchronous OOB only)
-  • Limited SSRF (outbound request control but restricted)
-  
-  Professional Features:
-  • Evidence-based classification (not payload reflection)
-  • OOB callback system for blind SSRF
-  • Cloud metadata endpoint detection (AWS/GCP/Azure)
-  • Internal network probing (RFC1918, loopback, link-local)
-  • Non-HTTP scheme testing (file, gopher, ftp, dict)
-  • Timing differential analysis
-  • Dual confidence scoring (request control + impact)
-  
-  Principle: Reflection ≠ SSRF (requires server-side network interaction)
-"#,
-    after_help = r#"EXAMPLES:
-
-SQL Injection:
-  anvil -t https://example.com/page?id=1 -p id --sqli
-  anvil -t https://example.com/page?id=1 -p id --sqli --dbs
-  anvil -t https://example.com/page?id=1 -p id --sqli -D testdb --tables
-  anvil -t https://example.com/page?id=1 -p id --sqli -D testdb -T users --dump
-
-Cross-Site Scripting (Default - Clean Summary):
-  anvil -t https://example.com/search?q=test -p q --xss
-  anvil -t https://example.com/comment -p message --xss --xss-stored
-  
-Cross-Site Scripting (Verbose - See Methodology):
-  anvil -t https://example.com/search?q=test -p q --xss --verbose
-  
-Cross-Site Scripting (Report - Full Documentation):
-  anvil -t https://example.com/search?q=test -p q --xss -o xss-report.txt
-  anvil -t https://example.com/search?q=test -p q --xss --format json -o results.json
-
-Server-Side Request Forgery (Default - All Tests):
-  anvil -t https://example.com/fetch?url=http://example.com -p url --ssrf
-  anvil -t https://example.com/webhook?callback=http://test.com --ssrf --ssrf-all
-  
-Server-Side Request Forgery (Specific Tests):
-  anvil -t https://example.com/fetch?url=test -p url --ssrf --ssrf-internal
-  anvil -t https://example.com/fetch?url=test -p url --ssrf --ssrf-metadata
-  anvil -t https://example.com/fetch?url=test -p url --ssrf --ssrf-schemes
-  
-Server-Side Request Forgery (Blind SSRF with OOB):
-  anvil -t https://example.com/fetch?url=test -p url --ssrf --ssrf-callback attacker.com
-
-Authentication:
-  anvil -t https://example.com/page?id=1 -p id --cookie "session=abc123" --sqli
-  anvil -t https://example.com/page?id=1 -p id -H "Authorization: Bearer token" --sqli
-
-Reporting:
-  anvil -t https://example.com -p id --sqli -o report.txt
-  anvil -t https://example.com -p id --sqli --format json -o results.json
-
-DOCUMENTATION:
-  docs/USAGE.md          Complete CLI reference
-  docs/SQL-INJECTION.md  SQLi methodology & exploitation
-  docs/XSS-DETECTION.md  XSS detection & validation
-  docs/REPORTING.md      Report formats & output modes
-  docs/QUICK_START.md    Getting started guide
-
-  https://github.com/siddhantbhattarai/anvil"#
+    about = "Enterprise-grade vulnerability scanner with advanced SQL injection, XSS, and SSRF detection",
+    long_about = None,
+    after_help = "EXAMPLES:\n  anvil -t http://target.com/page?id=1 -p id --sqli\n  anvil -t http://target.com/search?q=test -p q --xss\n  anvil -t http://target.com --all -o report.json\n\nMore info: https://github.com/siddhantbhattarai/anvil"
 )]
 pub struct Cli {
     /// Target URL (e.g. https://example.com/page.php?id=1)
@@ -361,6 +231,14 @@ pub struct Cli {
     /// Enumerate DBMS users roles
     #[arg(long, help_heading = "USER ENUM")]
     pub roles: bool,
+
+    /// Crack password hashes using dictionary attack
+    #[arg(long = "crack", help_heading = "USER ENUM")]
+    pub crack_hashes: bool,
+
+    /// Wordlist for hash cracking (default: built-in common passwords)
+    #[arg(long = "wordlist", help_heading = "USER ENUM")]
+    pub wordlist: Option<String>,
 
     // ═══════════════════════════════════════════════════════════════════
     // AUTHENTICATION
