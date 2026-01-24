@@ -1,295 +1,194 @@
-//! SQL Injection Domain Module
-//!
-//! This module provides comprehensive SQL injection detection and exploitation
-//! capabilities that surpass sqlmap:
-//!
-//! - `inference`: Detection techniques (boolean, time, stacked, oob, union)
-//! - `extract`: Data extraction (databases, tables, columns, dump)
-//! - `proof`: Safe metadata extraction (enterprise mode)
-//! - `workflow`: Advanced attack chains and orchestration
+//! SQL Injection Module
+//! 
+//! This module provides SQL injection detection and exploitation capabilities.
+//! Structure mirrors professional tools with separate modules for:
+//! - core: settings, enums, agent, queries
+//! - request: HTTP connection and page comparison
+//! - techniques: union, blind, error, dns
+//! - tamper: WAF bypass scripts
+//! - shell: Interactive SQL shell
+//! - file_access: Read/write files through SQLi
+//! - os_shell: OS command execution
 
-pub mod inference;
-pub mod extract;
-pub mod proof;
-pub mod workflow;
+pub mod core;
+pub mod request;
+pub mod techniques;
+pub mod tamper;
+pub mod shell;
+pub mod file_access;
+pub mod os_shell;
 
-// Re-export extraction types for convenience
-pub use extract::{Extractor, ExtractionConfig, ExtractionResult, DatabaseInfo, TableData};
+// Re-export main types
+pub use core::{DBMS, Agent, Queries, CHAR_START, CHAR_STOP, CHAR_DELIMITER, NULL};
+pub use request::Request;
+pub use techniques::{
+    // UNION
+    check_union, UnionVector, union_use, 
+    get_databases, get_tables, get_columns, dump_table,
+    get_current_db, get_current_user, get_version, get_users, get_passwords,
+    // Blind
+    check_boolean_blind, check_time_blind, BlindVector, extract_string, get_length,
+    // Error
+    check_error_based, ErrorVector, error_use, get_databases_error, get_tables_error,
+    // DNS/OOB
+    check_dns_exfiltration, DnsVector, dns_use,
+};
 
 use crate::http::client::HttpClient;
-use crate::scanner::sitemap::SiteMap;
+use anyhow::Result;
 use url::Url;
 
-/// Result of SQL injection testing
+// Compatibility aliases for existing code
+pub type DatabaseType = DBMS;
+
+/// SQL injection technique type (for compatibility)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SqliTechnique {
+    Union,
+    Boolean,
+    Error,
+    Time,
+    TimeBased,  // Alias for Time
+    Stacked,
+    Inline,
+}
+
+impl std::fmt::Display for SqliTechnique {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SqliTechnique::Union => write!(f, "UNION query"),
+            SqliTechnique::Boolean => write!(f, "Boolean-based blind"),
+            SqliTechnique::Error => write!(f, "Error-based"),
+            SqliTechnique::Time | SqliTechnique::TimeBased => write!(f, "Time-based blind"),
+            SqliTechnique::Stacked => write!(f, "Stacked queries"),
+            SqliTechnique::Inline => write!(f, "Inline query"),
+        }
+    }
+}
+
+/// SQL injection configuration (for compatibility)
+#[derive(Debug, Clone, Default)]
+pub struct SqliConfig {
+    pub techniques: Vec<SqliTechnique>,
+    pub level: u8,
+    pub risk: u8,
+}
+
+/// SQL Injection result (compatible with engine.rs)
 #[derive(Debug, Clone)]
 pub struct SqliResult {
     pub endpoint: String,
     pub parameter: String,
     pub technique: SqliTechnique,
     pub confidence: f32,
-    pub db_type: Option<DatabaseType>,
+    pub db_type: Option<DBMS>,
     pub details: String,
 }
 
-/// SQL injection detection technique used
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SqliTechnique {
-    Boolean,
-    ErrorBased,
-    TimeBased,
-    StackedQueries,
-    OutOfBand,
-    Union,
-    SecondOrder,
+/// Main SQL injection engine
+pub struct SqliEngine<'a> {
+    client: &'a HttpClient,
+    url: Option<Url>,
+    parameter: Option<String>,
+    pub vector: Option<UnionVector>,
+    pub db_type: DBMS,
 }
 
-impl std::fmt::Display for SqliTechnique {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SqliTechnique::Boolean => write!(f, "Boolean-based"),
-            SqliTechnique::ErrorBased => write!(f, "Error-based"),
-            SqliTechnique::TimeBased => write!(f, "Time-based"),
-            SqliTechnique::StackedQueries => write!(f, "Stacked Queries"),
-            SqliTechnique::OutOfBand => write!(f, "Out-of-Band"),
-            SqliTechnique::Union => write!(f, "UNION-based"),
-            SqliTechnique::SecondOrder => write!(f, "Second-Order"),
-        }
-    }
-}
-
-/// Detected database type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DatabaseType {
-    MySQL,
-    PostgreSQL,
-    MSSQL,
-    Oracle,
-    SQLite,
-    Unknown,
-}
-
-impl std::fmt::Display for DatabaseType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DatabaseType::MySQL => write!(f, "MySQL"),
-            DatabaseType::PostgreSQL => write!(f, "PostgreSQL"),
-            DatabaseType::MSSQL => write!(f, "MSSQL"),
-            DatabaseType::Oracle => write!(f, "Oracle"),
-            DatabaseType::SQLite => write!(f, "SQLite"),
-            DatabaseType::Unknown => write!(f, "Unknown"),
-        }
-    }
-}
-
-/// Configuration for SQL injection testing
-#[derive(Debug, Clone)]
-pub struct SqliConfig {
-    /// Enable boolean-based detection
-    pub boolean: bool,
-    /// Enable time-based detection
-    pub time_based: bool,
-    /// Enable stacked queries detection
-    pub stacked: bool,
-    /// Enable out-of-band detection
-    pub oob: bool,
-    /// OOB callback domain (e.g., "attacker.com")
-    pub oob_callback: Option<String>,
-    /// Number of samples for time-based detection
-    pub time_samples: usize,
-    /// Delay in seconds for time-based payloads
-    pub time_delay: u64,
-    /// Enable proof mode (safe metadata extraction)
-    pub proof_mode: bool,
-    /// Enable exploitation (dangerous, opt-in)
-    pub exploit_mode: bool,
-}
-
-impl Default for SqliConfig {
-    fn default() -> Self {
+impl<'a> SqliEngine<'a> {
+    pub fn new(client: &'a HttpClient) -> Self {
         Self {
-            boolean: true,
-            time_based: true,
-            stacked: false,
-            oob: false,
-            oob_callback: None,
-            time_samples: 6,
-            time_delay: 2,
-            proof_mode: false,
-            exploit_mode: false,
-        }
-    }
-}
-
-impl SqliConfig {
-    /// Enable all detection techniques
-    pub fn all() -> Self {
-        Self {
-            boolean: true,
-            time_based: true,
-            stacked: true,
-            oob: true,
-            oob_callback: None,
-            time_samples: 6,
-            time_delay: 2,
-            proof_mode: false,
-            exploit_mode: false,
+            client,
+            url: None,
+            parameter: None,
+            vector: None,
+            db_type: DBMS::Unknown,
         }
     }
 
-    /// Conservative config for production
-    pub fn safe() -> Self {
-        Self {
-            boolean: true,
-            time_based: true,
-            stacked: false,
-            oob: false,
-            oob_callback: None,
-            time_samples: 8,
-            time_delay: 2,
-            proof_mode: false,
-            exploit_mode: false,
+    /// Detect SQL injection vulnerability
+    pub async fn detect(&mut self, url: &Url, param: &str) -> Result<bool> {
+        self.url = Some(url.clone());
+        self.parameter = Some(param.to_string());
+        
+        let request = Request::new(self.client, url.clone(), param.to_string());
+
+        // Try UNION-based first (most powerful)
+        tracing::info!("Testing UNION-based SQL injection...");
+        if let Some(union_vector) = check_union(&request).await? {
+            self.db_type = union_vector.dbms;
+            self.vector = Some(union_vector);
+            return Ok(true);
         }
+
+        // Try error-based
+        tracing::info!("Testing error-based SQL injection...");
+        if let Some(error_vector) = check_error_based(&request).await? {
+            self.db_type = error_vector.dbms;
+            // Convert to union-like vector for compatibility
+            // Error-based doesn't have column info, so we can't use it for data extraction
+            return Ok(false); // For now, only support UNION
+        }
+
+        // Try boolean-based blind
+        tracing::info!("Testing boolean-based blind SQL injection...");
+        if let Some(_blind_vector) = check_boolean_blind(&request).await? {
+            // Blind is too slow for full enumeration
+            return Ok(false);
+        }
+
+        Ok(false)
     }
 
-    /// Set OOB callback domain
-    pub fn with_oob_callback(mut self, domain: &str) -> Self {
-        self.oob = true;
-        self.oob_callback = Some(domain.to_string());
-        self
-    }
-
-    /// Enable proof mode
-    pub fn with_proof(mut self) -> Self {
-        self.proof_mode = true;
-        self
-    }
-
-    /// Enable exploitation (dangerous)
-    pub fn with_exploit(mut self) -> Self {
-        self.exploit_mode = true;
-        self
-    }
-}
-
-/// Main SQL injection scanner
-pub struct SqliScanner {
-    config: SqliConfig,
-}
-
-impl SqliScanner {
-    pub fn new(config: SqliConfig) -> Self {
-        Self { config }
-    }
-
-    /// Run SQL injection tests against discovered endpoints
-    pub async fn scan(
-        &self,
-        client: &HttpClient,
-        target_url: &Url,
-        sitemap: &SiteMap,
-    ) -> anyhow::Result<Vec<SqliResult>> {
-        let mut results = Vec::new();
-
-        for (path, endpoint) in sitemap.endpoints.iter() {
-            if endpoint.parameters.is_empty() {
-                continue;
-            }
-
-            // Construct base URL, preserving query params if path matches target URL path
-            let base_url = if path == target_url.path() {
-                // Direct param mode: use target URL as-is (preserves query params like Submit=Submit)
-                target_url.clone()
-            } else {
-                // Crawled endpoint: join path to target
-                match target_url.join(path) {
-                    Ok(u) => u,
-                    Err(_) => continue,
-                }
-            };
-
-            for param in endpoint.parameters.iter() {
-                // Determine if we should use POST (based on endpoint method)
-                let use_post = endpoint.methods.contains("POST");
-                
-                // Boolean-based detection
-                if self.config.boolean {
-                    let result = if use_post {
-                        inference::boolean::detect_post(
-                            client,
-                            &base_url,
-                            param,
-                            Some("Submit=Submit"),
-                        ).await?
-                    } else {
-                        inference::boolean::detect(
-                            client,
-                            &base_url,
-                            param,
-                        ).await?
-                    };
-                    
-                    if let Some(r) = result {
-                        results.push(r);
-                    }
-                }
-
-                // Time-based detection
-                if self.config.time_based {
-                    if let Some(result) = inference::time::detect(
-                        client,
-                        &base_url,
-                        param,
-                        self.config.time_samples,
-                        self.config.time_delay,
-                    ).await? {
-                        results.push(result);
-                    }
-                }
-
-                // Stacked queries detection
-                if self.config.stacked {
-                    if let Some(result) = inference::stacked::detect(
-                        client,
-                        &base_url,
-                        param,
-                    ).await? {
-                        results.push(result);
-                    }
-                }
-
-                // Out-of-band detection
-                if self.config.oob {
-                    if let Some(callback) = &self.config.oob_callback {
-                        if let Some(result) = inference::oob::detect(
-                            client,
-                            &base_url,
-                            param,
-                            callback,
-                        ).await? {
-                            results.push(result);
-                        }
-                    }
-                }
+    /// Get current database
+    pub async fn get_current_db(&self, url: &Url, param: &str) -> Result<Option<String>> {
+        let request = Request::new(self.client, url.clone(), param.to_string());
+        
+        if let Some(ref v) = self.vector {
+            let result = get_current_db(&request, v).await?;
+            if !result.is_empty() {
+                return Ok(Some(result));
             }
         }
+        Ok(None)
+    }
 
-        // If proof mode enabled, extract metadata for confirmed SQLi
-        if self.config.proof_mode && !results.is_empty() {
-            for result in results.iter_mut() {
-                if result.confidence >= 0.8 {
-                    if let Ok(metadata) = proof::metadata::extract(
-                        client,
-                        &Url::parse(&result.endpoint)?,
-                        &result.parameter,
-                        result.db_type,
-                    ).await {
-                        result.details = format!("{}\n{}", result.details, metadata);
-                    }
-                }
-            }
+    /// Get all databases
+    pub async fn get_dbs(&self, url: &Url, param: &str) -> Result<Vec<String>> {
+        let request = Request::new(self.client, url.clone(), param.to_string());
+        
+        if let Some(ref v) = self.vector {
+            return get_databases(&request, v).await;
         }
+        Ok(vec![])
+    }
 
-        Ok(results)
+    /// Get tables in a database
+    pub async fn get_tables(&self, url: &Url, param: &str, database: &str) -> Result<Vec<String>> {
+        let request = Request::new(self.client, url.clone(), param.to_string());
+        
+        if let Some(ref v) = self.vector {
+            return get_tables(&request, v, database).await;
+        }
+        Ok(vec![])
+    }
+
+    /// Get columns in a table
+    pub async fn get_columns(&self, url: &Url, param: &str, database: &str, table: &str) -> Result<Vec<String>> {
+        let request = Request::new(self.client, url.clone(), param.to_string());
+        
+        if let Some(ref v) = self.vector {
+            return get_columns(&request, v, database, table).await;
+        }
+        Ok(vec![])
+    }
+
+    /// Dump table data
+    pub async fn dump_table(&self, url: &Url, param: &str, database: &str, table: &str, columns: &[String]) -> Result<Vec<Vec<String>>> {
+        let request = Request::new(self.client, url.clone(), param.to_string());
+        
+        if let Some(ref v) = self.vector {
+            return dump_table(&request, v, database, table, columns).await;
+        }
+        Ok(vec![])
     }
 }
-
