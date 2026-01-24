@@ -33,3 +33,13 @@ test_results/
 
 # OS files
 Thumbs.db
+
+# External tools (reference only, not part of project)
+/sqlmap/
+
+# Scripts (local only)
+git-push.sh
+
+# Temporary test files
+*.txt
+!README.txt
