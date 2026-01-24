@@ -51,4 +51,18 @@ impl HttpRequest {
         req.set_header("Content-Type", "application/x-www-form-urlencoded");
         req
     }
+
+    pub fn inject_payload(&mut self, payload: &str) {
+        // Inject payload into URL
+        let url_str = self.url.to_string();
+        if url_str.contains("=") {
+            if let Some(pos) = url_str.rfind("=") {
+                let base = &url_str[..pos + 1];
+                let new_url = format!("{}{}", base, payload);
+                if let Ok(parsed) = Url::parse(&new_url) {
+                    self.url = parsed;
+                }
+            }
+        }
+    }
 }
