@@ -134,4 +134,9 @@ impl HttpClient {
             elapsed_ms: start.elapsed().as_millis(),
         })
     }
+
+    /// Alias for execute() - used by extraction modules
+    pub async fn send(&self, req: HttpRequest) -> Result<HttpResponse> {
+        self.execute(req).await
+    }
 }
