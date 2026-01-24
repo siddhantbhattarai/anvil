@@ -185,17 +185,15 @@ impl Context {
             profile
         };
 
-        // Build SQLi configuration
+        // Build SQLi configuration (simplified)
         let sqli_config = SqliConfig {
-            boolean: profile.has(Capability::SqlInjection) || cli.technique.contains('B'),
-            time_based: profile.has(Capability::TimeSqlInjection) || cli.technique.contains('T'),
-            stacked: profile.has(Capability::StackedSqlInjection) || cli.technique.contains('S'),
-            oob: profile.has(Capability::OobSqlInjection),
-            oob_callback: cli.oob_callback,
-            time_samples: cli.time_samples,
-            time_delay: cli.time_delay,
-            proof_mode: profile.has(Capability::ProofMode),
-            exploit_mode: profile.has(Capability::ExploitMode),
+            techniques: vec![
+                crate::sqli::SqliTechnique::Union,
+                crate::sqli::SqliTechnique::Boolean,
+                crate::sqli::SqliTechnique::TimeBased,
+            ],
+            level: cli.level,
+            risk: cli.risk,
         };
 
         // Build SSRF configuration
