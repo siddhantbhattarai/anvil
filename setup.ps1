@@ -1,50 +1,55 @@
 # ANVIL Setup Script for Windows
-# Run this script in PowerShell as Administrator
-# Usage: .\setup.ps1
+# Usage (PowerShell):  .\setup.ps1
+# Tip: If scripts are blocked, run:
+#   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 param(
     [switch]$SkipRustInstall,
     [switch]$Force
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Colors and formatting
+# ----------------------------
+# Output helpers (ASCII only)
+# ----------------------------
 function Write-Title {
-    param([string]$Message)
+    param([Parameter(Mandatory)][string]$Message)
+
     Write-Host ""
-    Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║                    ANVIL Setup Script                          ║" -ForegroundColor Cyan
-    Write-Host "║        Enterprise-grade Security Testing Framework             ║" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Write-Host $Message -ForegroundColor Cyan
+    Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host ""
 }
 
 function Write-Status {
-    param([string]$Message)
+    param([Parameter(Mandatory)][string]$Message)
     Write-Host "[+] " -ForegroundColor Green -NoNewline
     Write-Host $Message
 }
 
-function Write-Warning {
-    param([string]$Message)
+function Write-Warn {
+    param([Parameter(Mandatory)][string]$Message)
     Write-Host "[!] " -ForegroundColor Yellow -NoNewline
     Write-Host $Message
 }
 
-function Write-Error {
-    param([string]$Message)
+function Write-Fail {
+    param([Parameter(Mandatory)][string]$Message)
     Write-Host "[-] " -ForegroundColor Red -NoNewline
     Write-Host $Message
 }
 
-# Check if running as Administrator
+# ----------------------------
+# Checks
+# ----------------------------
 function Test-Administrator {
     $currentUser = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     return $currentUser.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-# Check if Rust is installed
 function Test-RustInstalled {
     try {
         $rustVersion = & rustc --version 2>$null
@@ -52,185 +57,185 @@ function Test-RustInstalled {
             Write-Status "Rust is installed: $rustVersion"
             return $true
         }
-    } catch {
-        return $false
-    }
+    } catch { }
     return $false
 }
 
-# Install Rust using rustup
+# ----------------------------
+# Rust install (rustup)
+# ----------------------------
 function Install-Rust {
-    Write-Status "Downloading Rust installer..."
-    
-    $rustupUrl = "https://win.rustup.rs/x86_64"
-    $rustupPath = "$env:TEMP\rustup-init.exe"
-    
+    Write-Status "Downloading Rust installer (rustup-init.exe)..."
+
+    $rustupUrl  = "https://win.rustup.rs/x86_64"
+    $rustupPath = Join-Path $env:TEMP "rustup-init.exe"
+
     try {
-        Invoke-WebRequest -Uri $rustupUrl -OutFile $rustupPath -UseBasicParsing
+        # Ensure TLS 1.2 on older Windows/PS versions
+        try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+
+        Invoke-WebRequest -Uri $rustupUrl -OutFile $rustupPath
+
         Write-Status "Running Rust installer..."
-        
-        # Run rustup-init with default options
         Start-Process -FilePath $rustupPath -ArgumentList "-y" -Wait -NoNewWindow
-        
-        # Refresh environment
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-        
-        # Add cargo to current session
-        $cargoPath = "$env:USERPROFILE\.cargo\bin"
+
+        # Refresh PATH for this session
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath    = [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+        if ([string]::IsNullOrWhiteSpace($machinePath)) { $machinePath = "" }
+        if ([string]::IsNullOrWhiteSpace($userPath))    { $userPath    = "" }
+
+        if ($machinePath -and $userPath) {
+            $env:Path = "$machinePath;$userPath"
+        } elseif ($machinePath) {
+            $env:Path = $machinePath
+        } else {
+            $env:Path = $userPath
+        }
+
+        # Add cargo to current session just in case
+        $cargoPath = Join-Path $env:USERPROFILE ".cargo\bin"
         if ($env:Path -notlike "*$cargoPath*") {
             $env:Path += ";$cargoPath"
         }
-        
+
         Write-Status "Rust installed successfully"
         return $true
     } catch {
-        Write-Error "Failed to install Rust: $_"
+        Write-Fail "Failed to install Rust: $($_.Exception.Message)"
         return $false
     } finally {
         if (Test-Path $rustupPath) {
-            Remove-Item $rustupPath -Force
+            Remove-Item $rustupPath -Force -ErrorAction SilentlyContinue
         }
     }
 }
 
-# Build ANVIL
+# ----------------------------
+# Build / Install
+# ----------------------------
 function Build-Anvil {
-    Write-Status "Building ANVIL in release mode..."
-    
+    Write-Status "Building in release mode..."
     try {
         & cargo build --release
         if ($LASTEXITCODE -eq 0) {
             Write-Status "Build completed successfully"
             return $true
-        } else {
-            Write-Error "Build failed with exit code $LASTEXITCODE"
-            return $false
         }
+        Write-Fail "Build failed with exit code $LASTEXITCODE"
+        return $false
     } catch {
-        Write-Error "Build failed: $_"
+        Write-Fail "Build failed: $($_.Exception.Message)"
         return $false
     }
 }
 
-# Install ANVIL
 function Install-Anvil {
-    Write-Status "Installing ANVIL..."
-    
+    Write-Status "Installing..."
     try {
         & cargo install --path .
         if ($LASTEXITCODE -eq 0) {
-            Write-Status "ANVIL installed successfully"
+            Write-Status "Installed successfully"
             return $true
-        } else {
-            Write-Error "Installation failed with exit code $LASTEXITCODE"
-            return $false
         }
+        Write-Fail "Installation failed with exit code $LASTEXITCODE"
+        return $false
     } catch {
-        Write-Error "Installation failed: $_"
+        Write-Fail "Installation failed: $($_.Exception.Message)"
         return $false
     }
 }
 
-# Add Cargo bin to PATH
 function Add-CargoToPath {
-    $cargoPath = "$env:USERPROFILE\.cargo\bin"
-    
-    # Get current user PATH
+    $cargoPath = Join-Path $env:USERPROFILE ".cargo\bin"
     $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    
+
+    if ([string]::IsNullOrWhiteSpace($currentPath)) { $currentPath = "" }
+
     if ($currentPath -notlike "*$cargoPath*") {
-        Write-Status "Adding Cargo bin to PATH..."
-        
-        $newPath = "$currentPath;$cargoPath"
+        Write-Status "Adding Cargo bin to user PATH..."
+        $newPath = if ($currentPath) { "$currentPath;$cargoPath" } else { $cargoPath }
+
         [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-        
-        # Update current session
-        $env:Path += ";$cargoPath"
-        
+
+        # Update current session too
+        if ($env:Path -notlike "*$cargoPath*") {
+            $env:Path += ";$cargoPath"
+        }
+
         Write-Status "Added $cargoPath to PATH"
     } else {
         Write-Status "Cargo bin already in PATH"
     }
 }
 
-# Verify installation
 function Test-AnvilInstalled {
     try {
         $anvilVersion = & anvil --version 2>$null
-        if ($anvilVersion) {
-            return $true
-        }
+        return [bool]$anvilVersion
     } catch {
         return $false
     }
-    return $false
 }
 
-# Main installation
+# ----------------------------
+# Main
+# ----------------------------
 function Main {
-    Write-Title
-    
-    Write-Host "Starting ANVIL installation for Windows..." -ForegroundColor White
+    Write-Title "ANVIL Setup Script (Windows)"
+
+    if (-not (Test-Administrator)) {
+        Write-Warn "Not running as Administrator. If installation fails, re-run PowerShell as Administrator."
+    }
+
+    Write-Host "Starting installation..." -ForegroundColor White
     Write-Host ""
-    
-    # Check Rust
+
     if (-not (Test-RustInstalled)) {
         if ($SkipRustInstall) {
-            Write-Error "Rust is not installed. Please install Rust first."
-            Write-Host "  Download from: https://rustup.rs/"
+            Write-Fail "Rust is not installed and -SkipRustInstall was set."
             exit 1
         }
-        
-        Write-Warning "Rust not found. Installing..."
+
+        Write-Warn "Rust not found. Installing..."
         if (-not (Install-Rust)) {
-            Write-Error "Failed to install Rust. Please install manually from https://rustup.rs/"
+            Write-Fail "Rust install failed. Install Rust manually and re-run."
             exit 1
         }
-        
-        # Verify Rust after install
+
         if (-not (Test-RustInstalled)) {
-            Write-Warning "Rust installed but not in current session."
-            Write-Warning "Please restart PowerShell and run this script again."
+            Write-Warn "Rust installed but not available in this session."
+            Write-Warn "Close and re-open PowerShell, then run the script again."
             exit 0
         }
     }
-    
-    # Build
+
     if (-not (Build-Anvil)) {
-        Write-Error "Build failed. Please check the error messages above."
+        Write-Fail "Build failed."
         exit 1
     }
-    
-    # Install
+
     if (-not (Install-Anvil)) {
-        Write-Error "Installation failed. Please check the error messages above."
+        Write-Fail "Installation failed."
         exit 1
     }
-    
-    # Setup PATH
+
     Add-CargoToPath
-    
-    # Verify
+
     Write-Host ""
-    Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-    
+    Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
+
     if (Test-AnvilInstalled) {
-        $version = & anvil --version 2>$null | Select-Object -First 1
-        Write-Status "ANVIL installed successfully!"
-        Write-Host ""
-        Write-Host "  Version: $version" -ForegroundColor White
-        Write-Host ""
-        Write-Host "  Quick start:" -ForegroundColor White
-        Write-Host "    anvil --help" -ForegroundColor Gray
-        Write-Host "    anvil -t 'http://target.com/page?id=1' -p id --sqli --dbs" -ForegroundColor Gray
-        Write-Host ""
+        $version = (& anvil --version 2>$null | Select-Object -First 1)
+        Write-Status "Installed successfully!"
+        Write-Host "Version: $version" -ForegroundColor White
     } else {
-        Write-Warning "ANVIL installed but not in current PATH"
-        Write-Warning "Please restart PowerShell to use 'anvil' command"
+        Write-Warn "Installed, but 'anvil' isn't found in PATH yet."
+        Write-Warn "Close and re-open PowerShell and try: anvil --version"
     }
-    
-    Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+
+    Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
 }
 
-# Run main
 Main
