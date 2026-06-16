@@ -79,6 +79,8 @@ pub struct Context {
     // Injection customization
     pub prefix: Option<String>,
     pub suffix: Option<String>,
+    /// Callback domain for blind XSS (must route to the OOB listener).
+    pub xss_callback: Option<String>,
 }
 
 impl Context {
@@ -206,6 +208,13 @@ impl Context {
             internal_timeout: 2000,
             confidence_threshold: cli.threshold,
             max_payloads: cli.ssrf_max_payloads,
+            // When testing a POST request with a body, inject SSRF payloads into
+            // the body rather than the query string.
+            post_body: if cli.method.eq_ignore_ascii_case("POST") {
+                cli.data.clone()
+            } else {
+                None
+            },
         };
 
         // Parse custom headers
@@ -268,6 +277,7 @@ impl Context {
             threads: cli.threads,
             prefix: cli.prefix,
             suffix: cli.suffix,
+            xss_callback: cli.xss_callback,
         })
     }
 }

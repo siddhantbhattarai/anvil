@@ -157,6 +157,23 @@ impl Engine {
             None
         };
 
+        // Start the built-in OOB listeners (HTTP + DNS) once, up front, if any
+        // out-of-band callback domain is configured — shared by blind SQLi, SSRF
+        // and XSS. Idempotent; best-effort (DNS needs port 53 / privileges).
+        if self.ctx.ssrf_config.oob_callback.is_some() || self.ctx.xss_callback.is_some() {
+            match crate::ssrf::oob::start_oob_server("0.0.0.0:8888").await {
+                Ok(addr) => tracing::info!("OOB HTTP listener on {}", addr),
+                Err(e) => tracing::warn!("OOB HTTP listener unavailable: {}", e),
+            }
+            match crate::ssrf::oob::start_oob_dns_server("0.0.0.0:53").await {
+                Ok(addr) => tracing::info!("OOB DNS listener on {}", addr),
+                Err(e) => tracing::warn!(
+                    "OOB DNS listener unavailable on :53 ({}): DNS-based exfil disabled",
+                    e
+                ),
+            }
+        }
+
         // -------------------------------------------------
         // SQL INJECTION SCANNING
         // -------------------------------------------------
@@ -194,6 +211,10 @@ impl Engine {
         if self.ctx.profile.has(Capability::Xss) {
             tracing::info!("Running Professional Reflected XSS scan...");
             self.run_professional_xss_scan(&client, &target_url, &mut reporter).await?;
+
+            // Confirm reflected XSS by real JavaScript execution in a headless
+            // browser (upgrades findings to "Confirmed (Active Test)").
+            self.run_xss_execution_verify(&target_url, &mut reporter).await?;
         }
         
         // Stored/Persistent XSS Detection
@@ -206,6 +227,12 @@ impl Engine {
         if self.ctx.profile.has(Capability::DomXss) {
             tracing::info!("Running Professional DOM-based XSS scan...");
             self.run_dom_xss_scan(&client, &target_url, &mut reporter).await?;
+        }
+
+        // Blind XSS Detection (out-of-band)
+        if self.ctx.profile.has(Capability::BlindXss) {
+            tracing::info!("Running Blind XSS scan...");
+            self.run_blind_xss_scan(&client, &target_url, &mut reporter).await?;
         }
 
         // -------------------------------------------------
@@ -247,15 +274,29 @@ impl Engine {
         // Create SQLi engine and detect injection
         tracing::info!("Phase 1: Detecting SQL injection vulnerability...");
         
-        let mut engine = crate::sqli::SqliEngine::new(client);
-        
+        let sqli_point = crate::sqli::request::InjectionPoint::from_context(
+            reqwest::Method::from_bytes(self.ctx.http_method.as_bytes())
+                .unwrap_or(reqwest::Method::GET),
+            target_url.clone(),
+            &param_name,
+            self.ctx.post_data.clone(),
+            Vec::new(), // auth cookies/headers are carried by the HTTP client
+            Vec::new(),
+        );
+        let mut engine = crate::sqli::SqliEngine::with_injection_point(client, sqli_point)
+            .with_oob_callback(self.ctx.ssrf_config.oob_callback.clone());
+
         if !engine.detect(target_url, &param_name).await? {
             tracing::warn!("No SQL injection vulnerability detected");
             tracing::info!("Try adjusting --level and --risk for more thorough testing");
             return Ok(());
         }
 
-        tracing::info!("[+] SQL injection confirmed: UNION-based");
+        let tech = engine
+            .technique
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "detected".to_string());
+        tracing::info!("[+] SQL injection confirmed: {}", tech);
         tracing::info!("[+] Backend DBMS: {}", engine.db_type);
         
         if let Some(ref v) = engine.vector {
@@ -519,15 +560,39 @@ impl Engine {
             };
 
             for param in &ep.parameters {
-                let mut engine = crate::sqli::SqliEngine::new(client);
-                if engine.detect(&base_url, param).await? {
+                // `base_url` is `target_url.join(path)`, which drops the query —
+                // so re-seed this parameter's original value from the target URL
+                // (falling back to "1") so detection can build boundaries from
+                // the real value (needed for string-context SQLi).
+                let orig_val = target_url
+                    .query_pairs()
+                    .find(|(k, _)| k.as_ref() == param.as_str())
+                    .map(|(_, v)| v.to_string())
+                    .unwrap_or_else(|| "1".to_string());
+                let mut seeded_url = base_url.clone();
+                seeded_url.query_pairs_mut().append_pair(param, &orig_val);
+
+                let sqli_point = crate::sqli::request::InjectionPoint::from_context(
+                    reqwest::Method::from_bytes(self.ctx.http_method.as_bytes())
+                        .unwrap_or(reqwest::Method::GET),
+                    seeded_url.clone(),
+                    param,
+                    self.ctx.post_data.clone(),
+                    Vec::new(),
+                    Vec::new(),
+                );
+                let mut engine =
+                    crate::sqli::SqliEngine::with_injection_point(client, sqli_point)
+                        .with_oob_callback(self.ctx.ssrf_config.oob_callback.clone());
+                if engine.detect(&seeded_url, param).await? {
+                    let technique = engine.technique.unwrap_or(SqliTechnique::Union);
                     all_results.push(SqliResult {
                         endpoint: base_url.to_string(),
                         parameter: param.clone(),
-                        technique: SqliTechnique::Union,
+                        technique,
                         confidence: 0.9,
                         db_type: Some(engine.db_type),
-                        details: format!("UNION-based SQLi detected"),
+                        details: format!("{} SQLi detected", technique),
                     });
                 }
             }
@@ -704,6 +769,29 @@ impl Engine {
     }
     
     /// Legacy XSS scan (kept for backwards compatibility)
+    /// Whether a response's Content-Security-Policy blocks inline script/event
+    /// execution — i.e. it has an effective script directive (script-src, or
+    /// default-src as fallback) that lacks `unsafe-inline`. Reflected inline XSS
+    /// cannot execute under such a policy, so it should not be reported.
+    fn csp_blocks_inline(headers: &std::collections::HashMap<String, String>) -> bool {
+        let csp = match headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("content-security-policy"))
+        {
+            Some((_, v)) => v.to_lowercase(),
+            None => return false,
+        };
+        let directives: Vec<&str> = csp.split(';').map(|d| d.trim()).collect();
+        let script_dir = directives
+            .iter()
+            .find(|d| d.starts_with("script-src"))
+            .or_else(|| directives.iter().find(|d| d.starts_with("default-src")));
+        match script_dir {
+            Some(d) => !d.contains("unsafe-inline"),
+            None => false,
+        }
+    }
+
     async fn run_simple_xss_scan(
         &self,
         client: &HttpClient,
@@ -796,12 +884,21 @@ impl Engine {
                 let req = HttpRequest::new(Method::GET, test_url.clone());
                 match client.execute(req).await {
                     Ok(resp) => {
+                        // A restrictive CSP blocks inline execution, so reflected
+                        // inline XSS here is not exploitable — don't report it.
+                        if Self::csp_blocks_inline(&resp.headers) {
+                            if self.ctx.verbose {
+                                tracing::info!("  → reflected but blocked by Content-Security-Policy");
+                            }
+                            continue;
+                        }
+
                         let body = resp.body_text();
                         let body_lower = body.to_lowercase();
-                        
+
                         // Check if payload is reflected
                         let is_reflected = body.contains(payload);
-                        
+
                         if !is_reflected {
                             continue; // Payload was filtered/encoded
                         }
@@ -1554,7 +1651,190 @@ impl Engine {
         
         // Run stored XSS detection
         stored_engine.run(client, target_url, &param, reporter).await?;
-        
+
+        Ok(())
+    }
+
+    /// Confirm reflected XSS by driving a headless browser: inject canary
+    /// payloads that set a window variable on execution, then read it back. Adds
+    /// a "Confirmed (Active Test)" finding for any parameter that executes JS.
+    /// Silently skipped if no browser is available (heuristic results stand).
+    async fn run_xss_execution_verify(
+        &self,
+        target_url: &Url,
+        reporter: &mut crate::reporting::reporter::Reporter,
+    ) -> anyhow::Result<()> {
+        if crate::xss::headless::find_chrome().is_none() {
+            tracing::debug!("No headless browser available; skipping XSS execution verification");
+            return Ok(());
+        }
+
+        // POST-body verification when a POST body is supplied.
+        let is_post = self.ctx.http_method.eq_ignore_ascii_case("POST")
+            && self.ctx.post_data.is_some();
+        let body_params: Vec<(String, String)> = if is_post {
+            url::form_urlencoded::parse(
+                self.ctx.post_data.as_deref().unwrap_or("").as_bytes(),
+            )
+            .into_owned()
+            .collect()
+        } else {
+            Vec::new()
+        };
+
+        // Parameters to verify: the direct param, else the body/query parameters.
+        let mut params: Vec<String> = Vec::new();
+        if let Some(p) = &self.ctx.direct_param {
+            params.push(p.clone());
+        } else if is_post {
+            for (k, _) in &body_params {
+                if !params.contains(k) {
+                    params.push(k.clone());
+                }
+            }
+        } else {
+            for (k, _) in target_url.query_pairs() {
+                if !params.contains(&k.to_string()) {
+                    params.push(k.to_string());
+                }
+            }
+        }
+        if params.is_empty() {
+            return Ok(());
+        }
+
+        let verifier = match crate::xss::headless::HeadlessVerifier::launch().await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!("Headless XSS verifier unavailable: {}", e);
+                return Ok(());
+            }
+        };
+
+        for param in &params {
+            let result = if is_post {
+                verifier
+                    .verify_param_post(target_url.as_str(), param, &body_params)
+                    .await
+            } else {
+                verifier.verify_param(target_url, param).await
+            };
+            match result {
+                Ok(Some(proof)) => {
+                    tracing::warn!(
+                        "[XSS CONFIRMED - ACTIVE TEST] param '{}' executes JS via: {}",
+                        param,
+                        proof.payload
+                    );
+                    self.add_headless_xss_finding(target_url, param, &proof, reporter);
+                }
+                Ok(None) => {
+                    tracing::info!("No JS execution confirmed for param '{}'", param)
+                }
+                Err(e) => tracing::warn!("Headless verify error for '{}': {}", param, e),
+            }
+        }
+
+        verifier.close().await;
+        Ok(())
+    }
+
+    /// Add a headless-verified reflected-XSS finding (execution proven).
+    fn add_headless_xss_finding(
+        &self,
+        url: &Url,
+        param: &str,
+        proof: &crate::xss::headless::XssProof,
+        reporter: &mut crate::reporting::reporter::Reporter,
+    ) {
+        use crate::reporting::model::{Finding, Severity};
+        reporter.add(Finding {
+            vuln_type: "Cross-Site Scripting (XSS)".to_string(),
+            technique: "Reflected XSS (headless-verified)".to_string(),
+            endpoint: url.path().to_string(),
+            parameter: Some(param.to_string()),
+            confidence: 0.99,
+            severity: Severity::High,
+            evidence: format!(
+                "JavaScript execution confirmed in a real browser (Chrome headless via CDP).\n\
+                 Parameter: {}\n\
+                 Executing payload: {}",
+                param, proof.payload
+            ),
+            http_method: "GET".to_string(),
+            database: None,
+            cwe: "CWE-79".to_string(),
+            cvss_score: Some(8.2),
+            description:
+                "Reflected Cross-Site Scripting confirmed by actual JavaScript execution in a \
+                 headless browser (not merely payload reflection)."
+                    .to_string(),
+            impact:
+                "An attacker can execute arbitrary JavaScript in victims' browsers, enabling \
+                 session hijacking, credential theft, and account takeover."
+                    .to_string(),
+            remediation:
+                "Apply context-aware output encoding and a strict Content-Security-Policy."
+                    .to_string(),
+            references: vec![
+                "https://owasp.org/www-community/attacks/xss/".to_string(),
+                "https://cwe.mitre.org/data/definitions/79.html".to_string(),
+            ],
+            payload_sample: Some(proof.payload.clone()),
+        });
+    }
+
+    /// Run blind XSS detection: inject OOB payloads carrying unique correlation
+    /// IDs, then confirm any that reached the built-in interaction listener.
+    async fn run_blind_xss_scan(
+        &self,
+        client: &HttpClient,
+        target_url: &Url,
+        reporter: &mut crate::reporting::reporter::Reporter,
+    ) -> anyhow::Result<()> {
+        let callback_domain = match &self.ctx.xss_callback {
+            Some(d) => d.clone(),
+            None => {
+                tracing::warn!(
+                    "Blind XSS requested but no --callback domain provided; skipping"
+                );
+                return Ok(());
+            }
+        };
+
+        // Ensure the OOB interaction listener is running (idempotent — shared
+        // with blind SSRF). The callback domain must route to this host:port.
+        const OOB_BIND: &str = "0.0.0.0:8888";
+        match crate::ssrf::oob::start_oob_server(OOB_BIND).await {
+            Ok(addr) => tracing::info!(
+                "OOB listener on {} for blind XSS (callback domain '{}' must route here)",
+                addr,
+                callback_domain
+            ),
+            Err(e) => tracing::warn!("Failed to start OOB listener: {}", e),
+        }
+
+        let mut engine = crate::xss::blind::BlindXssEngine::new(callback_domain);
+
+        // Inject blind payloads into the chosen parameter.
+        let param = self.ctx.direct_param.clone().unwrap_or_else(|| "q".to_string());
+        if let Err(e) = engine.inject(client, target_url, &param).await {
+            tracing::warn!("Blind XSS injection failed for '{}': {}", param, e);
+        }
+
+        // Brief window for immediate callbacks, then correlate. Blind XSS often
+        // fires much later (when a victim renders the payload); the listener
+        // keeps running while anvil runs, but we report anything seen now.
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        let confirmed = engine.check_received_callbacks(reporter);
+        if confirmed > 0 {
+            tracing::warn!("[BLIND XSS] {} callback(s) confirmed during scan", confirmed);
+        } else {
+            tracing::info!(
+                "Blind XSS payloads injected; no callbacks yet (they may fire later)"
+            );
+        }
+
         Ok(())
     }
     
@@ -1807,6 +2087,8 @@ impl Engine {
         reporter: &mut crate::reporting::reporter::Reporter,
     ) -> anyhow::Result<()> {
         // Removed verbose methodology - enterprise tools are concise
+
+        // (OOB listeners are started once, up front, in run().)
 
         // Check if we have a direct parameter first (takes priority)
         if let Some(ref param) = self.ctx.direct_param {
