@@ -30,7 +30,37 @@ measures false positives, not just detection.
 | XSS  | HTML body, attribute, JS-string | html.escape |
 | SSRF | real server-side fetch | allowlist-only |
 
-## Latest results (debug build)
+## Scale run — OWASP-Benchmark-style (300 cases)
+
+Scored with the **official OWASP Benchmark metric: Benchmark Accuracy Score =
+TPR − FPR** (Youden's J). Corpus: `/bench/{sqli,xss}/{case}` — 50% genuinely
+vulnerable, 50% safe-but-look-alike (real sanitizers: parameterized queries,
+HTML-escaping), exactly OWASP Benchmark's true-positive/false-positive design.
+
+| Class | n | TP | TN | FP | FN | TPR | FPR | **OWASP Accuracy Score** |
+|-------|---|----|----|----|----|-----|-----|--------------------------|
+| SQLi  | 150 | 75 | 75 | 0 | 0 | 1.000 | 0.000 | **1.00** |
+| XSS   | 150 | 75 | 75 | 0 | 0 | 1.000 | 0.000 | **1.00** |
+| **Total** | **300** | 150 | 150 | **0** | **0** | **1.000** | **0.000** | **1.00** |
+
+**Perfect TPR 1.0 / FPR 0.0 across 300 cases** (150 true vulns + 150 safe
+look-alikes), release build, ~37 min. Zero false negatives *and* zero false
+positives — the 150 safe cases (parameterized SQL, escaped reflection across
+contexts) were all correctly left alone.
+
+```bash
+python3 benchmark/gen_corpus.py 150          # 300 cases (this run)
+python3 benchmark/gen_corpus.py 1370         # ~2740 — full OWASP-Benchmark size
+python3 benchmark/run_benchmark.py --manifest manifest_scale.json \
+        --tools anvil --anvil-bin target/release/anvil
+```
+
+> Caveat: this is an OWASP-Benchmark-*style* generated corpus (same design + same
+> scoring metric), not the official Java corpus — so the number is internally
+> reproducible, not directly comparable to published BenchmarkJava scores. A run
+> against the real BenchmarkJava is a documented follow-up.
+
+## Small-corpus results (head-to-head vs sqlmap/dalfox, debug build)
 
 | Tool | Scope (n) | Precision | Recall | F1 | Total time |
 |------|-----------|-----------|--------|----|-----------|
