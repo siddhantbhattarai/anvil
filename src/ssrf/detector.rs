@@ -6,6 +6,8 @@ use crate::ssrf::evidence::{Evidence, EvidenceType, SsrfClassification, SsrfResu
 use crate::ssrf::oob::{generate_identifier, OobCallbackGenerator, OobCallbackListener};
 use crate::ssrf::probes::{SsrfProbe, SsrfProbeGenerator, SsrfProbeType};
 use crate::ssrf::SsrfConfig;
+use crate::validation::baseline::Baseline;
+use crate::validation::diff::diff;
 use reqwest::Method;
 use std::time::{Duration, Instant};
 use url::Url;
@@ -108,86 +110,88 @@ impl SsrfDetector {
         Ok(None)
     }
 
-    /// Phase 1: Test if server makes outbound requests at all
+    /// Execute a request with `param_name` replaced by `value`, preserving all
+    /// other query parameters. Returns the HTTP response.
+    async fn request_with_param(
+        &self,
+        client: &HttpClient,
+        url: &Url,
+        param_name: &str,
+        value: &str,
+    ) -> anyhow::Result<crate::http::response::HttpResponse> {
+        let mut test_url_obj = url.clone();
+        {
+            let mut pairs = test_url_obj.query_pairs_mut();
+            pairs.clear();
+            for (k, v) in url.query_pairs() {
+                if k == param_name {
+                    pairs.append_pair(&k, value);
+                } else {
+                    pairs.append_pair(&k, &v);
+                }
+            }
+        }
+        let request = HttpRequest::new(Method::GET, test_url_obj);
+        client.execute(request).await
+    }
+
+    /// Phase 1: Test whether the parameter actually influences server-side
+    /// fetch/file behaviour. Evidence-based: we establish a baseline with a
+    /// benign inert value, then require either (a) outbound-fetch indicators or
+    /// (b) a material divergence from baseline for a fetch-like test value.
+    /// Returns `false` when there is no evidence the parameter drives a request
+    /// — previously this returned `true` unconditionally, marking every
+    /// parameter reachable and producing false positives downstream.
     async fn test_reachability(
         &self,
         client: &HttpClient,
         url: &Url,
         param_name: &str,
     ) -> anyhow::Result<bool> {
-        // First, test if parameter influences file/resource access
-        // This is more permissive for file inclusion vulnerabilities
-        
-        // Test 1: Try a simple file path change
-        let test_values = vec![
-            "test.txt",           // Simple file
-            "../../test",         // Path traversal indicator
-            "file:///etc/hosts",  // File scheme
+        // Baseline: an inert, non-fetching value for the parameter.
+        let baseline = match self
+            .request_with_param(client, url, param_name, "anvilbaselineprobe")
+            .await
+        {
+            Ok(resp) => Baseline::from_response(&resp),
+            Err(_) => return Ok(false),
+        };
+
+        // Fetch-like / file-like test values. If the parameter drives an
+        // outbound request or a local read, the response should diverge from
+        // baseline or expose fetched content.
+        let test_values = [
+            "http://example.com",
+            "https://example.com",
+            "file:///etc/hosts",
+            "test.txt",
         ];
 
         for test_val in test_values {
-            let mut test_url_obj = url.clone();
+            let response = match self
+                .request_with_param(client, url, param_name, test_val)
+                .await
             {
-                let mut pairs = test_url_obj.query_pairs_mut();
-                pairs.clear();
-                for (k, v) in url.query_pairs() {
-                    if k == param_name {
-                        pairs.append_pair(&k, test_val);
-                    } else {
-                        pairs.append_pair(&k, &v);
-                    }
-                }
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            // Strong signal: server fetched and reflected external content.
+            if self.has_outbound_indicators(&response.body_text()) {
+                return Ok(true);
             }
 
-            let request = HttpRequest::new(Method::GET, test_url_obj);
-            match client.execute(request).await {
-                Ok(response) => {
-                    let body = response.body_text();
-                    // Check if response changed significantly
-                    if body.len() > 100 {
-                        // Response exists, parameter likely influences server behavior
-                        return Ok(true);
-                    }
-                }
-                Err(_) => continue,
+            // Behavioural signal: the response materially differs from baseline
+            // (status flip or a meaningful body-length change), indicating the
+            // parameter changes server-side behaviour.
+            let d = diff(&baseline, &response);
+            if d.status_changed || d.body_len_delta.abs() > 100 {
+                return Ok(true);
             }
         }
 
-        // Test 2: Try external URL (traditional SSRF)
-        let test_urls = vec![
-            "http://example.com",
-            "https://example.com",
-        ];
-
-        for test_url in test_urls {
-            let mut test_url_obj = url.clone();
-            {
-                let mut pairs = test_url_obj.query_pairs_mut();
-                pairs.clear();
-                for (k, v) in url.query_pairs() {
-                    if k == param_name {
-                        pairs.append_pair(&k, test_url);
-                    } else {
-                        pairs.append_pair(&k, &v);
-                    }
-                }
-            }
-
-            let request = HttpRequest::new(Method::GET, test_url_obj);
-            match client.execute(request).await {
-                Ok(response) => {
-                    // Check for indicators that server made an outbound request
-                    if self.has_outbound_indicators(&response.body_text()) {
-                        return Ok(true);
-                    }
-                }
-                Err(_) => continue,
-            }
-        }
-
-        // If we got here, assume parameter might still be testable
-        // (permissive approach for file inclusion)
-        Ok(true)
+        // No evidence the parameter influences outbound/file behaviour.
+        Ok(false)
     }
 
     /// Test a specific SSRF probe

@@ -106,8 +106,13 @@ impl BlindXssEngine {
 }
 
 fn generate_unique_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    // Monotonic counter guarantees uniqueness even within the same second; the
+    // timestamp alone collided for IDs generated back-to-back.
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let timestamp = current_timestamp();
-    format!("BXSS{}", timestamp)
+    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("BXSS{}{:x}", timestamp, seq)
 }
 
 fn current_timestamp() -> u64 {
