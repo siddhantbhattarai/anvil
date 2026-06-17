@@ -2,7 +2,7 @@
 
 **Enterprise-grade Adversarial Security Testing Framework**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![Version](https://img.shields.io/badge/version-0.6.0-green.svg)](https://github.com/siddhantbhattarai/anvil)
 
@@ -323,7 +323,7 @@ anvil/
 ├── Cargo.toml               # Dependencies
 ├── setup.sh                 # Linux/macOS installer
 ├── setup.ps1                # Windows installer
-├── LICENSE                  # Apache 2.0
+├── LICENSE                  # PolyForm Noncommercial 1.0.0
 └── README.md                # This file
 ```
 
@@ -335,7 +335,13 @@ The authors are not responsible for any misuse or damage caused by this tool.
 
 ## 📄 License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+ANVIL is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)** — a source-available license.
+
+- ✅ **Free for noncommercial use** — personal projects, research, education, and noncommercial organizations.
+- ❌ **No commercial use, resale, or hosting** by others without a separate commercial license.
+- 🔒 **Authorized testing only** — the license includes an acceptable-use condition (test only systems you own or have written permission to test).
+
+All commercial rights are reserved by the author. For a commercial license, contact the author (see below).
 
 ## 🤝 Contributing
 

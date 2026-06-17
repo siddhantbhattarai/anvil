@@ -44,7 +44,7 @@ const BANNER: &str = r#"
  ║                                                                    ║
  ║    Author  : Siddhant Bhattarai                                    ║
  ║    Version : 0.6.0                                                 ║
- ║    License : Apache-2.0                                            ║
+ ║    License : PolyForm NC 1.0.0                                     ║
  ║                                                                    ║
  ╚════════════════════════════════════════════════════════════════════╝
 "#;
