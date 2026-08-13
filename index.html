@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANVIL · evidence-driven web vulnerability scanner</title>
+<meta name="description" content="ANVIL — a Rust web application security scanner that proves 11 active vulnerability classes and 5 passive audits across 8 of the OWASP Top 10. Signed apt repository.">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #121722;
+    --panel-2: #0f1420;
+    --border: #222b3a;
+    --text: #e6edf3;
+    --muted: #9aa7b8;
+    --accent: #ff7a45;
+    --accent-2: #22d3a6;
+    --code-bg: #0a0d14;
+    --shadow: 0 1px 0 rgba(255,255,255,.03), 0 12px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f8fb; --panel: #ffffff; --panel-2: #f2f5f9; --border: #e2e8f0;
+      --text: #0f172a; --muted: #55637a; --accent: #e2591f; --accent-2: #0f9d78;
+      --code-bg: #0d1117; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 12px 28px rgba(16,24,40,.08);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  header { padding: 72px 0 40px; border-bottom: 1px solid var(--border); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
+    border: 1px solid var(--border); background: var(--panel); padding: 5px 11px; border-radius: 999px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 25%, transparent); }
+  h1 { font-size: clamp(38px, 7vw, 60px); letter-spacing: -.03em; margin: 20px 0 8px; }
+  h1 .accent { color: var(--accent); }
+  .tagline { font-size: clamp(17px, 2.6vw, 21px); color: var(--muted); margin: 0 0 26px; max-width: 660px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 10px;
+    font-weight: 600; font-size: 15px; border: 1px solid var(--border);
+  }
+  .btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .btn-primary:hover { text-decoration: none; filter: brightness(1.07); }
+  .btn-ghost { background: var(--panel); color: var(--text); }
+  .btn-ghost:hover { text-decoration: none; border-color: var(--accent); }
+
+  section { padding: 46px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 22px; font-weight: 700; }
+
+  pre {
+    background: var(--code-bg); color: #e6edf3; padding: 18px 20px; border-radius: 12px;
+    overflow-x: auto; border: 1px solid var(--border); box-shadow: var(--shadow); margin: 0;
+    font-size: 14px; line-height: 1.7;
+  }
+  pre .c { color: #6b7c93; }
+  pre .k { color: #ffab7a; }
+  pre .s { color: #22d3a6; }
+  .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; display: flex; align-items: center; gap: 9px; }
+  .card .ic { width: 26px; height: 26px; flex: none; color: var(--accent); }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  table.owasp { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  table.owasp td, table.owasp th { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.owasp th { color: var(--muted); font-weight: 600; }
+  table.owasp td:first-child { white-space: nowrap; font-family: ui-monospace, monospace; color: var(--accent); }
+
+  .callout { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 14px 16px; color: var(--muted); font-size: 14.5px; }
+  .callout + .callout { margin-top: 12px; border-left-color: var(--accent-2); }
+  .callout b { color: var(--text); }
+
+  footer { padding: 34px 0 60px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <span class="badge"><span class="dot"></span> v0.6.0 · signed apt repository</span>
+      <h1>🔨 <span class="accent">ANVIL</span></h1>
+      <p class="tagline">An evidence-driven web application security scanner in Rust. It doesn't flag — it <em>proves</em>: 11 active vulnerability classes and 5 passive audits across 8 of the OWASP Top 10, with a low false-positive rate.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#install">Install via apt</a>
+        <a class="btn btn-ghost" href="https://github.com/siddhantbhattarai/anvil">View on GitHub →</a>
+      </div>
+    </div>
+  </header>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>Install — Debian / Ubuntu</h2>
+      <pre><code><span class="c"># add the signing key and repository</span>
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://siddhantbhattarai.github.io/anvil/pubkey.gpg \
+  | sudo tee /etc/apt/keyrings/anvil.asc &gt; /dev/null
+
+echo <span class="s">"deb [signed-by=/etc/apt/keyrings/anvil.asc] https://siddhantbhattarai.github.io/anvil stable main"</span> \
+  | sudo tee /etc/apt/sources.list.d/anvil.list
+
+sudo apt update
+sudo apt install anvil</code></pre>
+      <p class="note">Updates then arrive through <code>apt upgrade</code> like any other package. The repository metadata is GPG-signed; apt verifies every download against the key above. The optional headless XSS check uses a system Chrome/Chromium — <code>sudo apt install chromium</code> to enable it.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>What it proves</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h10"/></svg> Injection</h3>
+          <p>SQLi (UNION, boolean/time blind, error, OOB, stacked, second-order), NoSQLi, command injection, SSTI, CRLF — each confirmed by a working oracle.</p>
+        </div>
+        <div class="card">
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 3 4 4 4-4"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="m9 14 2 2 4-4"/></svg> XSS, actually executed</h3>
+          <p>Reflected, stored and DOM XSS verified by real execution in a headless browser — a canary sets <code>window.__ANVIL_XSS__</code> before it's called a finding.</p>
+        </div>
+        <div class="card">
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg> SSRF</h3>
+          <p>Internal-network probing (RFC1918), cloud metadata endpoints (AWS/GCP/Azure), alternate schemes, and blind SSRF via out-of-band callbacks.</p>
+        </div>
+        <div class="card">
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg> Access &amp; redirects</h3>
+          <p>Path traversal / LFI, open redirect, CORS misconfiguration, XXE — the black-box A01 and integrity classes.</p>
+        </div>
+        <div class="card">
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg> Passive audits</h3>
+          <p>Security headers &amp; cookie flags, JWT weaknesses, exposed secrets, outdated JS components with known CVEs, missing Subresource Integrity.</p>
+        </div>
+        <div class="card">
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10"/></svg> Automation &amp; agents</h3>
+          <p><code>--owasp</code> one-shot sweep, deterministic <code>--fail-on</code> exit codes for CI, JSON/CSV output, and a native MCP server for AI agents.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>OWASP Top 10 coverage</h2>
+      <table class="owasp">
+        <tr><th>OWASP 2021</th><th>ANVIL checks</th></tr>
+        <tr><td>A01</td><td>Path Traversal · Open Redirect · CORS</td></tr>
+        <tr><td>A02</td><td>Secret / sensitive-data exposure</td></tr>
+        <tr><td>A03</td><td>SQLi · NoSQLi · XSS · Command Injection · SSTI · CRLF</td></tr>
+        <tr><td>A05</td><td>CORS · security-header &amp; cookie audit</td></tr>
+        <tr><td>A06</td><td>Outdated JS component detection</td></tr>
+        <tr><td>A07</td><td>JWT weaknesses</td></tr>
+        <tr><td>A08</td><td>Subresource Integrity (SRI)</td></tr>
+        <tr><td>A10</td><td>SSRF</td></tr>
+      </table>
+      <p class="note">A04 (Insecure Design) and A09 (Logging Failures) are not detectable via black-box scanning.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Use</h2>
+      <pre><code><span class="c"># full OWASP sweep with crawling, JSON report</span>
+anvil -t http://target.com --owasp --crawl -o report.json --format json
+
+<span class="c"># CI / agent gate: exit 2 if anything High or worse is found</span>
+anvil -t http://target.com --owasp --fail-on high
+
+<span class="c"># targeted single-class checks</span>
+anvil -t "http://host/page?id=1" -p id  --sqli --dbs
+anvil -t "http://host/search?q=t" -p q  --xss --xss-all
+anvil -t "http://host/fetch?url=x" -p url --ssrf
+
+<span class="c"># run as an MCP server for AI agents (stdio JSON-RPC)</span>
+anvil --mcp</code></pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Ethics &amp; license</h2>
+      <div class="callout">
+        <b>Authorised testing only.</b> Always obtain written permission before testing any system you do not own. Unauthorised access to computer systems is illegal, and the authors accept no liability for misuse.
+      </div>
+      <div class="callout">
+        <b>Source-available.</b> ANVIL is licensed under PolyForm Noncommercial 1.0.0 — free for personal, research and educational use. Commercial use, resale or hosting for others requires a separate commercial license.
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap" style="display:flex; flex-wrap:wrap; gap:8px 20px; align-items:center; justify-content:space-between; width:100%;">
+      <span>PolyForm Noncommercial 1.0.0 · built in Rust</span>
+      <span><a href="https://github.com/siddhantbhattarai/anvil">github.com/siddhantbhattarai/anvil</a> · <a href="pubkey.gpg">signing key</a></span>
+    </div>
+  </footer>
+</body>
+</html>

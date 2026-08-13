@@ -1,0 +1,14 @@
+Origin: anvil
+Label: anvil
+Suite: stable
+Codename: stable
+Date: Thu, 13 Aug 2026 16:53:50 +0000
+Components: main
+Architectures: amd64
+Description: anvil apt repository
+MD5Sum:
+ 6e220355cb630accac9da83250f0e5e0              792 main/binary-amd64/Packages.gz
+ c1f94e782a18feb8395f5a061daabc57             1159 main/binary-amd64/Packages
+SHA256:
+ 7d0bb8982667ec429dcbdf387a1543a375226180b0fb9e6c8caedc2f40b75915              792 main/binary-amd64/Packages.gz
+ a5021b0d6514e1eac75ea9191bb00b14e1fbd5bdfe21507360621f9b918e0741             1159 main/binary-amd64/Packages

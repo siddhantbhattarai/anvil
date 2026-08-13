@@ -1,0 +1,24 @@
+Package: anvil
+Version: 0.6.0
+Architecture: amd64
+Maintainer: siddhantbhattarai <94698034+siddhantbhattarai@users.noreply.github.com>
+Installed-Size: 21452
+Depends: libc6 (>= 2.34)
+Recommends: chromium | chromium-browser | google-chrome-stable
+Filename: pool/main/anvil_0.6.0_amd64.deb
+Size: 5025940
+MD5sum: fd5ecb5bf1970b5ebfce3eea7703acf6
+SHA1: c1751fd4e43605f4c9d57a1482926f37a0587211
+SHA256: a604fec5aeedfcfc267238beeaf94d12ff288260462fdf14795619f82aaaf179
+Section: net
+Priority: optional
+Homepage: https://github.com/siddhantbhattarai/anvil
+Description: Evidence-driven web application vulnerability scanner
+ ANVIL detects and safely proves 11 active vulnerability classes (SQLi, NoSQLi,
+ XSS, SSRF, command injection, path traversal, SSTI, XXE, open redirect, CORS,
+ CRLF) plus 5 passive audits (security headers, JWT, secrets, outdated
+ components, SRI) — covering 8 of the OWASP Top 10 — with a low false-positive
+ rate. It emits machine-readable reports (text, JSON, CSV) for triage and CI
+ gating, and ships an MCP server so AI agents can call it as a native tool.
+ The optional headless-browser XSS verification uses a system Chrome/Chromium.
+

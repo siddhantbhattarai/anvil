@@ -1,0 +1,33 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: anvil
+Label: anvil
+Suite: stable
+Codename: stable
+Date: Thu, 13 Aug 2026 16:53:50 +0000
+Components: main
+Architectures: amd64
+Description: anvil apt repository
+MD5Sum:
+ 6e220355cb630accac9da83250f0e5e0              792 main/binary-amd64/Packages.gz
+ c1f94e782a18feb8395f5a061daabc57             1159 main/binary-amd64/Packages
+SHA256:
+ 7d0bb8982667ec429dcbdf387a1543a375226180b0fb9e6c8caedc2f40b75915              792 main/binary-amd64/Packages.gz
+ a5021b0d6514e1eac75ea9191bb00b14e1fbd5bdfe21507360621f9b918e0741             1159 main/binary-amd64/Packages
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEE2SjcVvSn2MYrC3ggGV0h7mbeGGwFAmp99p4ACgkQGV0h7mbe
+GGxQRg//dLMVFmx2X0WK3CeQg2PR6dO9CNhI1XEOZ2HHBh0ZeP1F5V6yY8TQY0II
+k/K9Mi5HmXbg+/2MDEzuKUFVyJIHJ3lDjo7i3dypKc4UHGbfNYtoQ01qKgrQqNZY
+XEYUCLf0azYWnxKrSvQ+ETHVBJfxiPRpf4x8GdLXdi+dq74jXToKDlWBWdvsJJd8
+ldL7Olo0Z+XY8AYDbKGEinehhMZ5AFOG5I62+oPVCzNxNFYv6b+bUasww4yJBvPk
+1foOvM6ev9STeIXpZjIacBcNld2L3wYgUgSK7qm8xoo8++y9n/OSgdgy2kKFyHDq
+sqaZldnmBGa6t9xqGg6lTOMavEBz2oVVaP/aO5ONW+IyPcRi+2bAD+J71cd/eqz1
+WEaXesQkmFUZADcgl2oXJ9zx7awv6yjydxqKXPoVpxdWQMLxfxztI0tNDj5QNIKk
+j7goxzEbBQLHA2hhzSgpYSswsJChn7DBSeW7Y1qZZeONbt3qsWa79oqopWMu5JmW
+MHic3syRc73eAUl4x7LjUEerIWBTo9lJO4OU8RDoT+MKvjbDAeHeabSZGCE+beRj
+2PtOZaW+Gz+7OI5xhZ68aCBhxgAy+wGbrcKgPbhC6ttdhXeiMy+a1m0l1XbjE2uB
+drBVyqfgNzs5rt7G2cv3OFNFvgjhgQAhZPCwKUlcXc5TjgA6i7w=
+=bFUt
+-----END PGP SIGNATURE-----
